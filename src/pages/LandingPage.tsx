@@ -31,7 +31,7 @@ const features = [
     icon: Sparkles,
     color: 'bg-purple-100 text-purple-700',
     title: 'Smart HS Code Engine',
-    description: 'AI-style rule-based HS code classification for easier product categorization and customs tariff lookup. Admin-verified per export.'
+    description: 'AI-style rule-based HS code classification for easier product categorization and customs tariff lookup. Customs-verified per export.'
   },
   {
     icon: FileText,

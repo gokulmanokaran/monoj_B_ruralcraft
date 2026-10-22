@@ -31,19 +31,6 @@ export const OrderDetailPage: React.FC = () => {
     success('Commercial Invoice PDF downloading...');
   };
 
-  const handleVerifyHS = async (itemIdx: number, newCode: string) => {
-    if (!customsDoc) return;
-    try {
-      const updated = await api.verifyCustoms(customsDoc.id, {
-        hs_codes: { [itemIdx]: newCode },
-        status: 'Admin_Verified'
-      });
-      setCustomsDoc(updated);
-      success('HS Code updated and customs document verified!');
-    } catch {
-      error('Failed to update HS code');
-    }
-  };
 
   if (loading) {
     return (
@@ -171,33 +158,17 @@ export const OrderDetailPage: React.FC = () => {
                 <p className="text-xs text-stone-500 mb-2">Invoice: <strong className="font-mono">{customsDoc.invoice_number}</strong></p>
                 <p className="text-xs text-stone-500 mb-3">Items: {customsDoc.items.length} · Weight: {customsDoc.total_weight_kg} kg</p>
 
-                {/* HS Code table with admin edit */}
+                {/* HS Code table */}
                 <div className="space-y-2">
                   {customsDoc.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 p-2 bg-stone-50 rounded-lg">
-                      <div className="flex-1 text-xs text-stone-700 truncate">{item.product_name}</div>
-                      {role === 'admin' ? (
-                        <input
-                          className="text-xs font-mono font-bold w-24 px-2 py-1 border border-[#DDA15E]/50 rounded-lg bg-[#DDA15E]/10 text-[#BC6C25] focus:outline-none"
-                          defaultValue={item.hs_code}
-                          onBlur={e => {
-                            if (e.target.value !== item.hs_code) {
-                              handleVerifyHS(idx, e.target.value);
-                            }
-                          }}
-                        />
-                      ) : (
-                        <span className="text-xs font-mono font-bold text-[#BC6C25]">{item.hs_code}</span>
-                      )}
+                    <div key={idx} className="flex items-center justify-between gap-2 p-2.5 bg-stone-50 rounded-xl">
+                      <div className="flex-1 text-xs text-stone-700 truncate font-medium">{item.product_name}</div>
+                      <span className="text-xs font-mono font-bold text-[#BC6C25] bg-[#DDA15E]/15 px-2 py-0.5 rounded-lg">
+                        HS {item.hs_code}
+                      </span>
                     </div>
                   ))}
                 </div>
-
-                {role === 'admin' && customsDoc.verification_status !== 'Admin_Verified' && (
-                  <p className="text-[10px] text-stone-400 mt-2 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> Click HS code to edit, blur to save & verify
-                  </p>
-                )}
 
                 <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-700 leading-relaxed">
                   {customsDoc.disclaimer}

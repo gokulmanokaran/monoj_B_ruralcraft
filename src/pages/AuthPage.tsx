@@ -56,13 +56,12 @@ export const AuthPage: React.FC = () => {
     }
   };
 
-  const handleDemoLogin = async (demoRole: 'customer' | 'artisan' | 'admin') => {
+  const handleDemoLogin = async (demoRole: 'customer' | 'artisan') => {
     setLoading(true);
     try {
       await demoLogin(demoRole);
       success(`Logged in as Demo ${demoRole}!`);
-      if (demoRole === 'admin') navigate('/admin');
-      else if (demoRole === 'artisan') navigate('/artisan');
+      if (demoRole === 'artisan') navigate('/artisan');
       else navigate('/');
     } catch {
       error('Demo login failed');
@@ -220,18 +219,17 @@ export const AuthPage: React.FC = () => {
             <p className="text-xs text-center text-stone-400 font-semibold uppercase tracking-wider mb-3">
               🚀 1-Click Demo Access
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               {[
-                { role: 'customer' as const, icon: User, label: 'Customer', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200' },
-                { role: 'artisan' as const, icon: Palette, label: 'Artisan', color: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200' },
-                { role: 'admin' as const, icon: Shield, label: 'Admin', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200' }
+                { role: 'customer' as const, icon: User, label: 'Customer (Buyer)', color: 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border-emerald-200' },
+                { role: 'artisan' as const, icon: Palette, label: 'Artisan (Seller)', color: 'bg-amber-50 text-amber-800 hover:bg-amber-100 border-amber-200' }
               ].map(({ role: r, icon: Icon, label, color }) => (
                 <button
                   key={r}
                   type="button"
                   onClick={() => handleDemoLogin(r)}
                   disabled={loading}
-                  className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${color}`}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${color}`}
                 >
                   <Icon className="w-4 h-4" />
                   {label}

@@ -232,27 +232,7 @@ class ApiService {
     });
   }
 
-  // --- ADMIN & HS CODES MASTER ---
-  async getAdminAnalytics() {
-    return this.request<{
-      metrics: {
-        total_users: number;
-        total_artisans: number;
-        total_products: number;
-        total_orders: number;
-        total_revenue_inr: number;
-        total_revenue_usd: number;
-        customs_documents_generated: number;
-        hs_codes_verified_rate: string;
-      };
-      charts: {
-        revenue_trend: { month: string; revenue_inr: number; revenue_usd: number; orders: number }[];
-        orders_by_country: { country: string; orders: number; revenue_usd: number }[];
-        category_share: { name: string; value: number; color: string }[];
-      };
-      recent_orders: Order[];
-    }>('/admin/analytics');
-  }
+  // --- HS CODES LOOKUP ---
 
   async getHSCodes(search?: string, category?: string) {
     const q = new URLSearchParams();

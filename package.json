@@ -4,14 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n \"SERVER,MAIN,ADMIN\" -c \"blue,green,magenta\" \"npm run server\" \"npm run client\" \"npm run admin\"",
-    "client": "vite",
-    "admin": "npm --prefix admin run dev",
+    "dev": "concurrently -n \"SERVER,FRONTEND,ADMIN\" -c \"blue,green,magenta\" \"npm run server\" \"npm run dev:frontend\" \"npm run dev:admin\"",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:admin": "npm --prefix admin run dev",
     "server": "tsx server/index.ts",
-    "build": "tsc -b && vite build",
+    "build": "npm --prefix frontend run build",
+    "build:frontend": "npm --prefix frontend run build",
     "build:admin": "npm --prefix admin run build",
-    "build:all": "npm run build && npm run build:admin",
-    "preview": "vite preview",
+    "build:all": "npm run build:frontend && npm run build:admin",
+    "preview": "npm --prefix frontend run preview",
     "preview:admin": "npm --prefix admin run preview"
   },
   "dependencies": {

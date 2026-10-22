@@ -1,24 +1,18 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { UserCheck, Sparkles, Shield, User as UserIcon, Palette } from 'lucide-react';
+import { User as UserIcon, Palette } from 'lucide-react';
 
 export const RoleSwitcher: React.FC = () => {
   const { user, role, demoLogin, loading } = useAuth();
   const { success } = useToast();
 
-  const handleSwitch = async (targetRole: 'customer' | 'artisan' | 'admin') => {
-    if (targetRole === 'admin') {
-      const adminUrl = import.meta.env.VITE_ADMIN_URL || 'http://localhost:5174';
-      window.open(adminUrl, '_blank');
-      return;
-    }
+  const handleSwitch = async (targetRole: 'customer' | 'artisan') => {
     if (role === targetRole) return;
     await demoLogin(targetRole);
     const names = {
       customer: 'Customer (Johnathan Doe)',
-      artisan: 'Artisan (Lakshmi Handicrafts)',
-      admin: 'Admin (Dr. Vikramaditya Sen)'
+      artisan: 'Artisan (Lakshmi Handicrafts)'
     };
     success(`Switched to demo role: ${names[targetRole]}`);
   };
@@ -31,7 +25,7 @@ export const RoleSwitcher: React.FC = () => {
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
         </span>
         <span className="font-semibold text-emerald-200 uppercase tracking-wider text-[10px]">
-          Demo Quick-Role Switcher:
+          Demo Role Switcher:
         </span>
         <span className="hidden sm:inline text-stone-300">
           Current: <strong className="text-white capitalize">{role || 'Guest'}</strong> {user ? `(${user.full_name})` : ''}
@@ -43,13 +37,13 @@ export const RoleSwitcher: React.FC = () => {
           type="button"
           disabled={loading}
           onClick={() => handleSwitch('customer')}
-          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+          className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
             role === 'customer'
               ? 'bg-[#DDA15E] text-[#1F2421] shadow-sm font-bold'
               : 'bg-white/10 hover:bg-white/20 text-white'
           }`}
         >
-          <UserIcon className="w-3 h-3" />
+          <UserIcon className="w-3.5 h-3.5" />
           <span>Customer</span>
         </button>
 
@@ -57,28 +51,14 @@ export const RoleSwitcher: React.FC = () => {
           type="button"
           disabled={loading}
           onClick={() => handleSwitch('artisan')}
-          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+          className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
             role === 'artisan'
               ? 'bg-[#DDA15E] text-[#1F2421] shadow-sm font-bold'
               : 'bg-white/10 hover:bg-white/20 text-white'
           }`}
         >
-          <Palette className="w-3 h-3" />
+          <Palette className="w-3.5 h-3.5" />
           <span>Artisan</span>
-        </button>
-
-        <button
-          type="button"
-          disabled={loading}
-          onClick={() => handleSwitch('admin')}
-          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-            role === 'admin'
-              ? 'bg-[#DDA15E] text-[#1F2421] shadow-sm font-bold'
-              : 'bg-white/10 hover:bg-white/20 text-white'
-          }`}
-        >
-          <Shield className="w-3 h-3" />
-          <span>Admin</span>
         </button>
       </div>
     </div>

@@ -11,7 +11,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, pass: string) => Promise<void>;
   register: (data: { email: string; password: string; full_name: string; phone?: string; role?: string; brand_name?: string; craft_type?: string; location?: string }) => Promise<void>;
-  demoLogin: (role: 'customer' | 'artisan' | 'admin') => Promise<void>;
+  demoLogin: (role: 'customer' | 'artisan') => Promise<void>;
   logout: () => void;
   updateUserArtisan: (artisan: Artisan) => void;
 }
@@ -76,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const demoLogin = async (roleToUse: 'customer' | 'artisan' | 'admin') => {
+  const demoLogin = async (roleToUse: 'customer' | 'artisan') => {
     setLoading(true);
     try {
       const res = await api.demoLogin(roleToUse);
