@@ -8,6 +8,11 @@ export const RoleSwitcher: React.FC = () => {
   const { success } = useToast();
 
   const handleSwitch = async (targetRole: 'customer' | 'artisan' | 'admin') => {
+    if (targetRole === 'admin') {
+      const adminUrl = import.meta.env.VITE_ADMIN_URL || 'http://localhost:5174';
+      window.open(adminUrl, '_blank');
+      return;
+    }
     if (role === targetRole) return;
     await demoLogin(targetRole);
     const names = {

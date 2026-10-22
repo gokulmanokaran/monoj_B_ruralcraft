@@ -95,7 +95,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, index = 0 }) 
               <Award className="w-3 h-3 text-[#BC6C25]" />
               <span className="text-xs text-[#BC6C25] font-semibold truncate">{product.artisan_name}</span>
               {product.hs_code_verified && (
-                <Shield className="w-3 h-3 text-[#2D6A4F] ml-1" title="HS Code Verified" />
+                <span title="HS Code Verified">
+                  <Shield className="w-3 h-3 text-[#2D6A4F] ml-1" />
+                </span>
               )}
             </div>
 
