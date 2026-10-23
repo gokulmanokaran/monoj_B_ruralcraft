@@ -62,14 +62,16 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: strin
   return <>{children}</>;
 };
 
-// Protected Admin route wrapper (strictly enforces Supabase admin authenticated session)
+// Protected Admin route wrapper (strictly enforces Supabase admin authenticated session for admin@gmail.com)
 const ProtectedAdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, role, loading } = useAuth();
+  const { isAuthenticated, role, user, loading } = useAuth();
 
   if (loading) return <AdminLoader />;
 
-  if (!isAuthenticated || role !== 'admin') {
-    return <Navigate to="/admin/login" replace />;
+  const isAdminUser = isAuthenticated && role === 'admin' && (user?.email?.trim().toLowerCase() === 'admin@gmail.com');
+
+  if (!isAdminUser) {
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;

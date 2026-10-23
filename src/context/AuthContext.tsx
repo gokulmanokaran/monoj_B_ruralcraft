@@ -57,7 +57,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .eq('id', sessionUser.id)
           .maybeSingle();
 
-        const role: UserRole = (prof?.role as any) || (sessionUser.email === 'admin@gmail.com' ? 'admin' : 'customer');
+        const userEmail = (sessionUser.email || '').trim().toLowerCase();
+        const isAdminEmail = userEmail === 'admin@gmail.com';
+        const role: UserRole = isAdminEmail ? 'admin' : (prof?.role === 'artisan' ? 'artisan' : 'customer');
 
         let art: Artisan | null = null;
         if (role === 'artisan') {
@@ -72,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const authUser: User = {
           id: sessionUser.id,
           email: sessionUser.email || '',
-          full_name: prof?.full_name || (sessionUser.email === 'admin@gmail.com' ? 'Administrator' : 'User'),
+          full_name: prof?.full_name || (isAdminEmail ? 'Administrator' : 'Customer'),
           phone: prof?.phone,
           role
         };
@@ -127,12 +129,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .eq('id', session.user.id)
           .maybeSingle();
 
-        const role: UserRole = (prof?.role as any) || (session.user.email === 'admin@gmail.com' ? 'admin' : 'customer');
+        const userEmail = (session.user.email || '').trim().toLowerCase();
+        const isAdminEmail = userEmail === 'admin@gmail.com';
+        const role: UserRole = isAdminEmail ? 'admin' : (prof?.role === 'artisan' ? 'artisan' : 'customer');
 
         setUser({
           id: session.user.id,
           email: session.user.email || '',
-          full_name: prof?.full_name || (session.user.email === 'admin@gmail.com' ? 'Administrator' : 'User'),
+          full_name: prof?.full_name || (isAdminEmail ? 'Administrator' : 'Customer'),
           phone: prof?.phone,
           role
         });
@@ -192,7 +196,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
-        const role: UserRole = (prof?.role as any) || (cleanEmail === 'admin@gmail.com' ? 'admin' : 'customer');
+        const isAdminEmail = cleanEmail === 'admin@gmail.com';
+        // Only admin@gmail.com can ever have admin role
+        const role: UserRole = isAdminEmail ? 'admin' : (prof?.role === 'artisan' ? 'artisan' : 'customer');
 
         let art: Artisan | null = null;
         if (role === 'artisan') {
@@ -207,7 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const authUser: User = {
           id: authData.user.id,
           email: authData.user.email || cleanEmail,
-          full_name: prof?.full_name || (cleanEmail === 'admin@gmail.com' ? 'Administrator' : 'User'),
+          full_name: prof?.full_name || (isAdminEmail ? 'Administrator' : 'Customer'),
           phone: prof?.phone,
           role
         };
