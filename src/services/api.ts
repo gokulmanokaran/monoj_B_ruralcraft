@@ -93,11 +93,9 @@ class ApiService {
     brand_name?: string;
     craft_type?: string;
     location?: string;
-  }): Promise<{
-    user: User;
-    profile: Profile;
-    artisan: Artisan | null;
-  }> {
+  }): Promise<void> {
+    // The DB trigger `on_auth_user_created` auto-creates the profile row.
+    // Artisan record is created after OTP verification via ensureArtisanRecord().
     const role = data.role || 'customer';
 
     const { data: authData, error: authErr } = await supabase.auth.signUp({
@@ -106,7 +104,7 @@ class ApiService {
       options: {
         data: {
           full_name: data.full_name,
-          phone: data.phone,
+          phone: data.phone || null,
           role
         }
       }
@@ -119,55 +117,39 @@ class ApiService {
     if (!authData.user) {
       throw new Error('Registration failed. Please try again.');
     }
+    // Email confirmation OTP will be sent by Supabase automatically.
+    // User must verify OTP before they can log in.
+  }
 
-    // Create profile entry
-    const { data: profile, error: profileErr } = await supabase
-      .from('profiles')
-      .upsert({
-        id: authData.user.id,
-        full_name: data.full_name,
-        phone: data.phone || null,
-        role
-      })
-      .select()
-      .single();
+  // Called after OTP verification for artisan users to create artisan record
+  async ensureArtisanRecord(userId: string, data: {
+    brand_name: string;
+    craft_type: string;
+    location: string;
+    phone: string;
+    full_name: string;
+  }): Promise<void> {
+    // Check if artisan record already exists
+    const { data: existing } = await supabase
+      .from('artisans')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    if (profileErr) {
-      console.warn('Profile creation error:', profileErr.message);
-    }
+    if (existing) return; // already exists
 
-    // If registered as an artisan, create the artisan record
-    let artisan: Artisan | null = null;
-    if (role === 'artisan') {
-      const { data: newArtisan } = await supabase
-        .from('artisans')
-        .insert({
-          user_id: authData.user.id,
-          brand_name: data.brand_name || data.full_name + ' Crafts',
-          craft_type: data.craft_type || 'Traditional Crafts',
-          story: 'Authentic handcrafted artisanal goods.',
-          location: data.location || 'India',
-          country: 'India',
-          verified: false,
-          rating: 5.0,
-          total_sales: 0,
-          phone: data.phone || ''
-        })
-        .select()
-        .maybeSingle();
-
-      artisan = newArtisan || null;
-    }
-
-    const user: User = {
-      id: authData.user.id,
-      email: authData.user.email || data.email,
-      full_name: data.full_name,
-      phone: data.phone,
-      role: role as any
-    };
-
-    return { user, profile: profile as Profile, artisan };
+    await supabase.from('artisans').insert({
+      user_id: userId,
+      brand_name: data.brand_name,
+      craft_type: data.craft_type || 'Traditional Crafts',
+      story: 'Authentic handcrafted artisanal goods.',
+      location: data.location || 'India',
+      country: 'India',
+      verified: false,
+      rating: 5.0,
+      total_sales: 0,
+      phone: data.phone || ''
+    });
   }
 
   async getMe(): Promise<{ user: User; profile: Profile; artisan: Artisan | null } | null> {

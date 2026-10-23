@@ -12,6 +12,7 @@ import { ProductDetailPage } from './pages/ProductDetailPage';
 import { CartPage } from './pages/CartPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { AuthPage } from './pages/AuthPage';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { ArtisansPage } from './pages/ArtisansPage';
 import { ArtisanProfilePage } from './pages/ArtisanProfilePage';
 import { OrdersPage } from './pages/OrdersPage';
@@ -88,6 +89,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/cart" element={<CartPage />} />
       <Route path="/login" element={<AuthPage />} />
       <Route path="/register" element={<AuthPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
       {/* Protected Customer Routes */}
       <Route path="/checkout" element={<CheckoutPage />} />

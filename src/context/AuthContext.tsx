@@ -21,7 +21,12 @@ interface AuthContextType {
     brand_name?: string;
     craft_type?: string;
     location?: string;
-  }) => Promise<{ user: User; profile: Profile; artisan: Artisan | null }>;
+  }) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  verifyOtp: (email: string, token: string, pendingArtisan?: {
+    brand_name: string; craft_type: string; location: string; phone: string; full_name: string;
+  } | null) => Promise<{ user: User; profile: Profile; artisan: Artisan | null }>;
+  resendOtp: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserArtisan: (artisan: Artisan) => void;
   refreshUser: () => Promise<void>;
@@ -35,11 +40,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [artisan, setArtisan] = useState<Artisan | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Initialize and synchronize Supabase Auth session
-  const initAuth = async () => {
+  const loadUser = async () => {
     try {
       const data = await api.getMe();
-      if (data && data.user) {
+      if (data?.user) {
         setUser(data.user);
         setProfile(data.profile);
         setArtisan(data.artisan);
@@ -53,27 +57,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setProfile(null);
       setArtisan(null);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    initAuth();
+    let initialized = false;
 
-    // Listen to real-time Supabase auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
+    const init = async () => {
+      await loadUser();
+      setLoading(false);
+      initialized = true;
+    };
+
+    init();
+
+    // Listen to Supabase auth state changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!initialized) return; // avoid double-loading on startup
+
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
-        const me = await api.getMe();
-        if (me) {
-          setUser(me.user);
-          setProfile(me.profile);
-          setArtisan(me.artisan);
+        if (session?.user) {
+          const me = await api.getMe();
+          if (me) {
+            setUser(me.user);
+            setProfile(me.profile);
+            setArtisan(me.artisan);
+          }
         }
+        setLoading(false);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
         setArtisan(null);
+        setLoading(false);
       }
     });
 
@@ -105,22 +121,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     craft_type?: string;
     location?: string;
   }) => {
+    // Just call signUp — profile is created by DB trigger on_auth_user_created
+    // Session won't be active until email is verified
+    await api.register(data);
+    // Don't set user here — wait for OTP verification
+  };
+
+  const loginWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        }
+      }
+    });
+    if (error) throw new Error(error.message);
+    // Redirect happens automatically — no need to handle state here
+  };
+
+  const verifyOtp = async (
+    email: string,
+    token: string,
+    pendingArtisan?: {
+      brand_name: string; craft_type: string; location: string; phone: string; full_name: string;
+    } | null
+  ) => {
     setLoading(true);
     try {
-      const res = await api.register(data);
-      setUser(res.user);
-      setProfile(res.profile);
-      setArtisan(res.artisan);
-      return res;
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'signup'
+      });
+
+      if (error) throw new Error(error.message);
+      if (!data.user) throw new Error('Verification failed. Please try again.');
+
+      // After verification, ensure profile exists (trigger may have created it already)
+      // If artisan, create artisan record now
+      if (pendingArtisan) {
+        await api.ensureArtisanRecord(data.user.id, pendingArtisan);
+      }
+
+      const me = await api.getMe();
+      if (!me) throw new Error('Could not load user profile after verification.');
+
+      setUser(me.user);
+      setProfile(me.profile);
+      setArtisan(me.artisan);
+      return me;
     } finally {
       setLoading(false);
     }
   };
 
+  const resendOtp = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+    });
+    if (error) throw new Error(error.message);
+  };
+
   const logout = async () => {
     setLoading(true);
     try {
-      await api.logout();
+      await supabase.auth.signOut();
       setUser(null);
       setProfile(null);
       setArtisan(null);
@@ -158,6 +227,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         login,
         register,
+        loginWithGoogle,
+        verifyOtp,
+        resendOtp,
         logout,
         updateUserArtisan,
         refreshUser
