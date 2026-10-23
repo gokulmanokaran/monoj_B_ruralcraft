@@ -8,12 +8,13 @@ import {
   LayoutDashboard, Package, ShoppingBag, Users, FileText, Code,
   Globe, Settings, LogOut, Plus, ChevronRight,
   ArrowUp, DollarSign, Download, Search, RefreshCw,
-  ExternalLink, CheckCircle2, AlertCircle, X, ShieldCheck
+  ExternalLink, CheckCircle2, AlertCircle, X, ShieldCheck,
+  Trash2, Eye, Upload, Sparkles, Image as ImageIcon
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { api } from '../../services/api';
-import type { Order, HSCodeMaster, CustomsDocument, Product, Artisan, CurrencyRates } from '../../types';
+import type { Order, HSCodeMaster, CustomsDocument, Product, Artisan, CurrencyRates, Category } from '../../types';
 import { generateCustomsPDF } from '../../services/pdfGenerator';
 
 interface AdminDashboardProps {
@@ -36,10 +37,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
   const [hsCodes, setHsCodes] = useState<HSCodeMaster[]>([]);
   const [customsDocs, setCustomsDocs] = useState<CustomsDocument[]>([]);
   const [currencyRates, setCurrencyRates] = useState<CurrencyRates | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   // Search/filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddHSOpen, setIsAddHSOpen] = useState(false);
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [uploadingProduct, setUploadingProduct] = useState(false);
+  const [hsSuggesting, setHsSuggesting] = useState(false);
+
+  const [newProduct, setNewProduct] = useState({
+    name: '',
+    category_id: '',
+    category_name: '',
+    price_inr: '',
+    stock: '15',
+    weight_kg: '0.8',
+    dimensions: '25 x 15 x 15 cm',
+    material: 'Natural Terracotta Clay',
+    country_of_origin: 'India',
+    suggested_hs_code: '6912.00',
+    description: '',
+    image_url: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=800',
+    status: 'active' as const
+  });
+
   const [newHS, setNewHS] = useState({
     category: 'Handicrafts',
     hs_code: '',
@@ -64,14 +86,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [analyticsData, artisansData, productsData, ordersData, hsData, customsData, ratesData] = await Promise.all([
+      const [analyticsData, artisansData, productsData, ordersData, hsData, customsData, ratesData, categoriesData] = await Promise.all([
         api.getAdminAnalytics().catch(() => null),
         api.getArtisans().catch(() => []),
         api.getProducts({ status: '' }).then(res => res.products).catch(() => []),
         api.getOrders().catch(() => []),
         api.getHSCodes().catch(() => []),
         api.getCustomsDocs().catch(() => []),
-        api.getCurrencyRates().catch(() => null)
+        api.getCurrencyRates().catch(() => null),
+        api.getCategories().catch(() => [])
       ]);
 
       setAnalytics(analyticsData);
@@ -81,10 +104,119 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
       setHsCodes(hsData);
       setCustomsDocs(customsData);
       setCurrencyRates(ratesData);
+      setCategories(categoriesData);
+
+      if (categoriesData.length > 0 && !newProduct.category_id) {
+        setNewProduct(prev => ({
+          ...prev,
+          category_id: categoriesData[0].id,
+          category_name: categoriesData[0].name
+        }));
+      }
     } catch {
       error('Failed to load portal data from Supabase');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAutoSuggestHS = async () => {
+    if (!newProduct.name && !newProduct.material) {
+      error('Please enter product title or material first');
+      return;
+    }
+    setHsSuggesting(true);
+    try {
+      const res = await api.suggestHSCode({
+        name: newProduct.name,
+        material: newProduct.material,
+        description: newProduct.description,
+        category_name: newProduct.category_name
+      });
+      setNewProduct(prev => ({ ...prev, suggested_hs_code: res.hs_code }));
+      success(`HS Code auto-suggested: ${res.hs_code} (${res.confidence} confidence)`);
+    } catch {
+      error('Failed to auto-suggest HS Code');
+    } finally {
+      setHsSuggesting(false);
+    }
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      error('Image size must be less than 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewProduct(prev => ({ ...prev, image_url: reader.result as string }));
+      success('Image loaded for preview!');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProduct.name.trim() || !newProduct.price_inr) {
+      error('Product title and price (INR) are required');
+      return;
+    }
+
+    setUploadingProduct(true);
+    try {
+      const cat = categories.find(c => c.id === newProduct.category_id || c.name === newProduct.category_name) || categories[0];
+
+      const created = await api.createProduct({
+        name: newProduct.name.trim(),
+        category_id: cat?.id,
+        category_name: cat?.name || newProduct.category_name || 'Pottery & Ceramics',
+        price_inr: parseFloat(newProduct.price_inr),
+        stock: parseInt(newProduct.stock) || 10,
+        weight_kg: parseFloat(newProduct.weight_kg) || 0.5,
+        dimensions: newProduct.dimensions || '',
+        material: newProduct.material || 'Traditional Handcrafted',
+        country_of_origin: newProduct.country_of_origin || 'India',
+        suggested_hs_code: newProduct.suggested_hs_code || '6912.00',
+        description: newProduct.description.trim() || `${newProduct.name} - authentic handmade craft by rural artisans.`,
+        images: [newProduct.image_url || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=800'],
+        status: newProduct.status || 'active'
+      });
+
+      success(`Product "${created.name}" uploaded to Supabase & live on store!`);
+      setIsAddProductOpen(false);
+      setNewProduct({
+        name: '',
+        category_id: categories[0]?.id || '',
+        category_name: categories[0]?.name || '',
+        price_inr: '',
+        stock: '15',
+        weight_kg: '0.8',
+        dimensions: '25 x 15 x 15 cm',
+        material: 'Natural Terracotta Clay',
+        country_of_origin: 'India',
+        suggested_hs_code: '6912.00',
+        description: '',
+        image_url: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=800',
+        status: 'active'
+      });
+      await loadAllData();
+    } catch (err: any) {
+      error(err.message || 'Failed to upload product to Supabase');
+    } finally {
+      setUploadingProduct(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${name}" from Supabase?`)) return;
+    try {
+      await api.deleteProduct(id);
+      success(`Product "${name}" deleted from database`);
+      await loadAllData();
+    } catch (err: any) {
+      error(err.message || 'Failed to delete product');
     }
   };
 
@@ -477,15 +609,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
                   <h1 className="font-heading font-black text-2xl text-stone-900">Products Catalog</h1>
                   <p className="text-xs text-stone-500 mt-0.5">Manage inventory, prices, and HS code tariff assignments</p>
                 </div>
-                <div className="relative">
-                  <Search className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="Search catalog..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="pl-9 pr-4 py-2 border border-stone-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#143826]/20"
-                  />
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search catalog..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="pl-9 pr-4 py-2 border border-stone-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setIsAddProductOpen(true)}
+                    className="px-4 py-2 bg-[#143826] hover:bg-[#0D2818] text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm cursor-pointer transition-all"
+                  >
+                    <Plus className="w-4 h-4 text-[#DDA15E]" />
+                    Upload Product
+                  </button>
                 </div>
               </div>
 
@@ -501,6 +642,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
                           <th className="px-4 py-3">Stock</th>
                           <th className="px-4 py-3">HS Code</th>
                           <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-stone-100">
@@ -510,7 +652,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
                             <tr key={product.id} className="hover:bg-stone-50/60 transition-colors">
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-lg overflow-hidden bg-stone-100 shrink-0">
+                                  <div className="w-9 h-9 rounded-lg overflow-hidden bg-stone-100 shrink-0 border border-stone-200">
                                     <img
                                       src={product.images[0] || 'https://images.unsplash.com/photo-1596178065887-1198b6148b2b?q=80&w=100&auto=format&fit=crop'}
                                       alt={product.name}
@@ -534,6 +676,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
                                   {product.status}
                                 </span>
                               </td>
+                              <td className="px-4 py-3 text-right">
+                                <div className="inline-flex items-center gap-1.5">
+                                  <Link
+                                    to={`/products/${product.slug}`}
+                                    target="_blank"
+                                    title="View product on public store"
+                                    className="p-1.5 rounded-lg text-stone-400 hover:text-[#143826] hover:bg-stone-100 transition-colors"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </Link>
+                                  <button
+                                    onClick={() => handleDeleteProduct(product.id, product.name)}
+                                    title="Delete product from Supabase"
+                                    className="p-1.5 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
                             </tr>
                           ))}
                       </tbody>
@@ -544,7 +705,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
                 <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
                   <Package className="w-12 h-12 text-stone-300 mx-auto mb-3" />
                   <h3 className="font-heading font-bold text-stone-700 text-base mb-1">No products in catalog</h3>
-                  <p className="text-xs text-stone-400">Products listed by verified artisans will appear here.</p>
+                  <p className="text-xs text-stone-400 mb-4">Upload authentic rural artisan products directly to Supabase.</p>
+                  <button
+                    onClick={() => setIsAddProductOpen(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#143826] text-white rounded-xl text-xs font-bold hover:bg-[#0D2818] shadow-sm transition-all cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4 text-[#DDA15E]" />
+                    Upload Your First Product
+                  </button>
                 </div>
               )}
             </div>
@@ -910,6 +1078,287 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
                     className="px-4 py-2 bg-[#143826] text-white rounded-xl text-xs font-bold hover:bg-[#0D2818]"
                   >
                     Save HS Code
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Upload Product to Supabase */}
+      <AnimatePresence>
+        {isAddProductOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl my-8 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-stone-100 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#143826] flex items-center justify-center text-[#DDA15E]">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-black text-lg text-stone-900">Upload Product to Supabase</h3>
+                    <p className="text-xs text-stone-500">Live syncs to Explore catalog, detail pages, and multi-currency engine</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddProductOpen(false)}
+                  className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUploadProduct} className="space-y-4">
+                {/* Product Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Product Title <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Handcrafted Jaipur Blue Pottery Flower Vase"
+                    value={newProduct.name}
+                    onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20 focus:border-[#143826] transition-colors"
+                  />
+                </div>
+
+                {/* Category & Price */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Category <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={newProduct.category_id}
+                      onChange={e => {
+                        const sel = categories.find(c => c.id === e.target.value);
+                        setNewProduct({
+                          ...newProduct,
+                          category_id: e.target.value,
+                          category_name: sel?.name || ''
+                        });
+                      }}
+                      className="w-full px-3 py-2.5 border border-stone-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-[#143826]/20 focus:border-[#143826]"
+                    >
+                      {categories.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Price (INR ₹) <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs">₹</span>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        step="1"
+                        placeholder="1850"
+                        value={newProduct.price_inr}
+                        onChange={e => setNewProduct({ ...newProduct, price_inr: e.target.value })}
+                        className="w-full pl-7 pr-3 py-2.5 border border-stone-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#143826]/20 focus:border-[#143826]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stock, Weight, Dimensions */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">Stock Units</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="15"
+                      value={newProduct.stock}
+                      onChange={e => setNewProduct({ ...newProduct, stock: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">Weight (kg)</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0.05"
+                      placeholder="0.85"
+                      value={newProduct.weight_kg}
+                      onChange={e => setNewProduct({ ...newProduct, weight_kg: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">Dimensions</label>
+                    <input
+                      type="text"
+                      placeholder="25 x 15 cm"
+                      value={newProduct.dimensions}
+                      onChange={e => setNewProduct({ ...newProduct, dimensions: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Material & HS Code */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">Material Composition</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Quartz Stone, Clay & Natural Glaze"
+                      value={newProduct.material}
+                      onChange={e => setNewProduct({ ...newProduct, material: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-stone-700">HS Customs Code</label>
+                      <button
+                        type="button"
+                        onClick={handleAutoSuggestHS}
+                        disabled={hsSuggesting}
+                        className="text-[11px] text-[#143826] font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Sparkles className="w-3 h-3 text-[#DDA15E]" />
+                        {hsSuggesting ? 'Analyzing...' : 'Auto-Suggest'}
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="e.g. 6912.00"
+                      value={newProduct.suggested_hs_code}
+                      onChange={e => setNewProduct({ ...newProduct, suggested_hs_code: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs font-mono font-bold text-[#BC6C25] focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Image Section */}
+                <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-stone-800">Product Image</label>
+                    <span className="text-[10px] text-stone-400">Direct URL or Preset Selection</span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      placeholder="https://images.unsplash.com/..."
+                      value={newProduct.image_url}
+                      onChange={e => setNewProduct({ ...newProduct, image_url: e.target.value })}
+                      className="flex-1 px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                    <label className="px-3 py-2 bg-stone-200 hover:bg-stone-300 text-stone-700 text-xs font-semibold rounded-xl cursor-pointer flex items-center gap-1.5 shrink-0 transition-colors">
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      Browse
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {/* 1-Click Quick Presets */}
+                  <div>
+                    <div className="text-[11px] font-semibold text-stone-600 mb-1.5">Quick Handicraft Photo Presets:</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { label: '🏺 Blue Pottery Vase', url: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=800' },
+                        { label: '🧣 Pashmina Silk', url: 'https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?auto=format&fit=crop&q=80&w=800' },
+                        { label: '🐘 Carved Teak', url: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&q=80&w=800' },
+                        { label: '🪔 Dokra Metal', url: 'https://images.unsplash.com/photo-1582561424760-0321d75e81fa?auto=format&fit=crop&q=80&w=800' },
+                        { label: '🧺 Bamboo Basket', url: 'https://images.unsplash.com/photo-1596178065887-1198b6148b2b?auto=format&fit=crop&q=80&w=800' },
+                        { label: '💎 Marble Inlay', url: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=800' }
+                      ].map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setNewProduct({ ...newProduct, image_url: preset.url })}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors cursor-pointer ${
+                            newProduct.image_url === preset.url
+                              ? 'bg-[#143826] text-white border-[#143826]'
+                              : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Preview */}
+                  {newProduct.image_url && (
+                    <div className="flex items-center gap-3 pt-2 border-t border-stone-200/60">
+                      <img
+                        src={newProduct.image_url}
+                        alt="Preview"
+                        className="w-14 h-14 rounded-xl object-cover border border-stone-200 shadow-sm shrink-0"
+                        onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=800'; }}
+                      />
+                      <div className="text-[11px] text-stone-500">
+                        <span className="font-semibold text-stone-800">Preview:</span> Image will be displayed on the customer product card and detail page.
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">Description & Artisan Story</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Describe how the craft is handmade, materials used, and heritage origins..."
+                    value={newProduct.description}
+                    onChange={e => setNewProduct({ ...newProduct, description: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20 focus:border-[#143826]"
+                  />
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2.5 pt-4 border-t border-stone-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddProductOpen(false)}
+                    disabled={uploadingProduct}
+                    className="px-5 py-2.5 border border-stone-200 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-50 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={uploadingProduct}
+                    className="px-6 py-2.5 bg-[#143826] hover:bg-[#0D2818] text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-60 cursor-pointer"
+                  >
+                    {uploadingProduct ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        Uploading to Supabase...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-3.5 h-3.5 text-[#DDA15E]" />
+                        Upload & Publish to Supabase
+                      </>
+                    )}
                   </button>
                 </div>
               </form>

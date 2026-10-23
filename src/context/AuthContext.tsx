@@ -45,7 +45,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadUser = async () => {
     try {
-      // Check for direct local admin session first (no Supabase account needed)
+      // 1. First check active Supabase Auth session
+      const { data: sessionData } = await supabase.auth.getSession();
+      const sessionUser = sessionData?.session?.user;
+
+      if (sessionUser) {
+        // Fetch profile from Supabase
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', sessionUser.id)
+          .maybeSingle();
+
+        const role: UserRole = (prof?.role as any) || (sessionUser.email === 'admin@gmail.com' ? 'admin' : 'customer');
+
+        let art: Artisan | null = null;
+        if (role === 'artisan') {
+          const { data: artData } = await supabase
+            .from('artisans')
+            .select('*')
+            .eq('user_id', sessionUser.id)
+            .maybeSingle();
+          art = artData;
+        }
+
+        const authUser: User = {
+          id: sessionUser.id,
+          email: sessionUser.email || '',
+          full_name: prof?.full_name || (sessionUser.email === 'admin@gmail.com' ? 'Administrator' : 'User'),
+          phone: prof?.phone,
+          role
+        };
+
+        setUser(authUser);
+        setProfile(prof || {
+          id: sessionUser.id,
+          full_name: authUser.full_name,
+          role,
+          country: 'India'
+        });
+        setArtisan(art);
+        return;
+      }
+
+      // 2. Check local admin session fallback
       if (typeof window !== 'undefined' && localStorage.getItem(LOCAL_ADMIN_KEY) === 'true') {
         setUser(FIXED_ADMIN_USER);
         setProfile(FIXED_ADMIN_PROFILE);
@@ -53,16 +96,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      const data = await api.getMe();
-      if (data?.user) {
-        setUser(data.user);
-        setProfile(data.profile);
-        setArtisan(data.artisan);
-      } else {
-        setUser(null);
-        setProfile(null);
-        setArtisan(null);
-      }
+      setUser(null);
+      setProfile(null);
+      setArtisan(null);
     } catch {
       setUser(null);
       setProfile(null);
@@ -84,20 +120,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!ready) return;
 
-      // When local admin is active, keep local session intact
-      if (typeof window !== 'undefined' && localStorage.getItem(LOCAL_ADMIN_KEY) === 'true') {
-        return;
-      }
-
       if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') && session?.user) {
-        const me = await api.getMe();
-        if (me) {
-          setUser(me.user);
-          setProfile(me.profile);
-          setArtisan(me.artisan);
-        }
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        const role: UserRole = (prof?.role as any) || (session.user.email === 'admin@gmail.com' ? 'admin' : 'customer');
+
+        setUser({
+          id: session.user.id,
+          email: session.user.email || '',
+          full_name: prof?.full_name || (session.user.email === 'admin@gmail.com' ? 'Administrator' : 'User'),
+          phone: prof?.phone,
+          role
+        });
+        setProfile(prof || null);
         setLoading(false);
       } else if (event === 'SIGNED_OUT') {
+        if (typeof window !== 'undefined' && localStorage.getItem(LOCAL_ADMIN_KEY) === 'true') {
+          // Keep local admin intact
+          return;
+        }
         setUser(null);
         setProfile(null);
         setArtisan(null);
@@ -113,34 +158,89 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const cleanEmail = email.trim().toLowerCase();
 
-      // Direct Admin Login (admin@gmail.com / admin@123) without requiring Supabase auth
-      if (cleanEmail === 'admin@gmail.com') {
-        if (pass === 'admin@123') {
-          if (typeof window !== 'undefined') {
-            localStorage.setItem(LOCAL_ADMIN_KEY, 'true');
-          }
-          setUser(FIXED_ADMIN_USER);
-          setProfile(FIXED_ADMIN_PROFILE);
-          setArtisan(null);
-          return {
-            user: FIXED_ADMIN_USER,
-            profile: FIXED_ADMIN_PROFILE,
-            artisan: null
-          };
-        } else {
-          throw new Error('Invalid password. Please use admin@123');
+      // Attempt Supabase Auth signInWithPassword first!
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: pass
+      });
+
+      if (!authError && authData?.user) {
+        // Supabase Auth succeeded!
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(LOCAL_ADMIN_KEY);
         }
+
+        let { data: prof } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+
+        // If admin email, ensure profile role is 'admin' in Supabase
+        if (cleanEmail === 'admin@gmail.com') {
+          if (!prof || prof.role !== 'admin') {
+            const { data: updatedProf } = await supabase
+              .from('profiles')
+              .upsert({
+                id: authData.user.id,
+                full_name: 'Administrator',
+                role: 'admin'
+              })
+              .select()
+              .single();
+            if (updatedProf) prof = updatedProf;
+          }
+        }
+
+        const role: UserRole = (prof?.role as any) || (cleanEmail === 'admin@gmail.com' ? 'admin' : 'customer');
+
+        let art: Artisan | null = null;
+        if (role === 'artisan') {
+          const { data: artData } = await supabase
+            .from('artisans')
+            .select('*')
+            .eq('user_id', authData.user.id)
+            .maybeSingle();
+          art = artData;
+        }
+
+        const authUser: User = {
+          id: authData.user.id,
+          email: authData.user.email || cleanEmail,
+          full_name: prof?.full_name || (cleanEmail === 'admin@gmail.com' ? 'Administrator' : 'User'),
+          phone: prof?.phone,
+          role
+        };
+
+        setUser(authUser);
+        setProfile(prof || {
+          id: authData.user.id,
+          full_name: authUser.full_name,
+          role,
+          country: 'India'
+        });
+        setArtisan(art);
+        return { user: authUser, profile: prof as Profile, artisan: art };
       }
 
-      // Customer login via Supabase Auth
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(LOCAL_ADMIN_KEY);
+      // If Supabase sign-in failed:
+      // For admin@gmail.com / admin@123, fallback to direct admin session if not in Supabase Auth yet
+      if (cleanEmail === 'admin@gmail.com' && pass === 'admin@123') {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(LOCAL_ADMIN_KEY, 'true');
+        }
+        setUser(FIXED_ADMIN_USER);
+        setProfile(FIXED_ADMIN_PROFILE);
+        setArtisan(null);
+        return {
+          user: FIXED_ADMIN_USER,
+          profile: FIXED_ADMIN_PROFILE,
+          artisan: null
+        };
       }
-      const res = await api.login(email, pass);
-      setUser(res.user);
-      setProfile(res.profile);
-      setArtisan(res.artisan);
-      return res;
+
+      // If wrong password or non-admin user failed
+      throw new Error(authError?.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
@@ -166,19 +266,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshUser = async () => {
-    if (typeof window !== 'undefined' && localStorage.getItem(LOCAL_ADMIN_KEY) === 'true') {
-      setUser(FIXED_ADMIN_USER);
-      setProfile(FIXED_ADMIN_PROFILE);
-      setArtisan(null);
-      return;
-    }
-
-    const me = await api.getMe();
-    if (me) {
-      setUser(me.user);
-      setProfile(me.profile);
-      setArtisan(me.artisan);
-    }
+    await loadUser();
   };
 
   const role = user?.role ?? null;
