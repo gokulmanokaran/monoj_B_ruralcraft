@@ -15,7 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { api } from '../../services/api';
 import type { Order, HSCodeMaster, CustomsDocument, Product, Artisan, CurrencyRates, Category } from '../../types';
-import { generateCustomsPDF } from '../../services/pdfGenerator';
+import { generateCustomsPDF, createCustomsDocFromOrder } from '../../services/pdfGenerator';
 
 interface AdminDashboardProps {
   initialTab?: string;
@@ -293,8 +293,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
   };
 
   const handleDownloadCustoms = (doc: CustomsDocument) => {
-    generateCustomsPDF(doc);
-    info(`Downloading Commercial Invoice ${doc.invoice_number}...`);
+    try {
+      generateCustomsPDF(doc);
+      info(`Downloading Commercial Invoice ${doc.invoice_number}...`);
+    } catch (err: any) {
+      console.error('Customs PDF download error:', err);
+      error(err.message || 'Failed to download Customs PDF');
+    }
+  };
+
+  const handleDownloadOrderCustoms = (order: Order) => {
+    try {
+      const doc = customsDocs.find(d => d.order_id === order.id) || createCustomsDocFromOrder(order);
+      generateCustomsPDF(doc, order);
+      info(`Downloading Commercial Invoice for ${order.order_number}...`);
+    } catch (err: any) {
+      console.error('Customs PDF generation error:', err);
+      error(err.message || 'Failed to download Customs PDF');
+    }
   };
 
   const handleLogout = async () => {
@@ -773,12 +789,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
                         <div className="text-stone-500">
                           {order.items?.length || 0} items in order
                         </div>
-                        <Link
-                          to={`/orders/${order.id}`}
-                          className="text-[#143826] font-semibold hover:underline"
-                        >
-                          View Order Details →
-                        </Link>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleDownloadOrderCustoms(order)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#143826]/10 text-[#143826] hover:bg-[#143826]/20 transition-colors cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Customs PDF
+                          </button>
+                          <Link
+                            to={`/orders/${order.id}`}
+                            className="text-[#143826] font-semibold hover:underline"
+                          >
+                            View Order Details →
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   ))}

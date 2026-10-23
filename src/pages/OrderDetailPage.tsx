@@ -5,7 +5,7 @@ import { Download, ChevronLeft, Shield, Sparkles, AlertCircle } from 'lucide-rea
 import { MainLayout } from '../layouts/MainLayout';
 import { api } from '../services/api';
 import type { Order, CustomsDocument } from '../types';
-import { generateCustomsPDF } from '../services/pdfGenerator';
+import { generateCustomsPDF, createCustomsDocFromOrder } from '../services/pdfGenerator';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -26,9 +26,17 @@ export const OrderDetailPage: React.FC = () => {
   }, [id]);
 
   const handleDownloadPDF = () => {
-    if (!customsDoc || !order) { error('Customs document not available'); return; }
-    generateCustomsPDF(customsDoc, order);
-    success('Commercial Invoice PDF downloading...');
+    if (!order) {
+      error('Order information not loaded');
+      return;
+    }
+    try {
+      const doc = customsDoc || createCustomsDocFromOrder(order);
+      generateCustomsPDF(doc, order);
+      success('Commercial Invoice PDF downloaded!');
+    } catch (e: any) {
+      error(e.message || 'Failed to download Customs PDF');
+    }
   };
 
 
@@ -83,15 +91,13 @@ export const OrderDetailPage: React.FC = () => {
               Placed {new Date(order.created_at).toLocaleDateString('en-IN', { dateStyle: 'long' })}
             </p>
           </div>
-          {customsDoc && (
-            <button
-              onClick={handleDownloadPDF}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#143826] text-white rounded-xl text-sm font-bold hover:bg-[#0D2818] transition-colors cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-              Download Customs PDF
-            </button>
-          )}
+          <button
+            onClick={handleDownloadPDF}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#143826] hover:bg-[#0D2818] text-white rounded-xl text-sm font-bold transition-all shadow-sm cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-[#DDA15E]" />
+            Download Customs PDF
+          </button>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-5">

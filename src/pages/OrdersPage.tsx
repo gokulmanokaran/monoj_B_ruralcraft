@@ -4,8 +4,8 @@ import { motion } from 'framer-motion';
 import { Package, FileText, Download, ChevronRight, Clock, Truck, CheckCircle2, XCircle } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { api } from '../services/api';
-import type { Order } from '../types';
-import { generateCustomsPDF } from '../services/pdfGenerator';
+import type { Order, CustomsDocument } from '../types';
+import { generateCustomsPDF, createCustomsDocFromOrder } from '../services/pdfGenerator';
 import { useToast } from '../context/ToastContext';
 
 const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
@@ -31,15 +31,23 @@ export const OrdersPage: React.FC = () => {
 
   const handleDownloadPDF = async (order: Order) => {
     try {
-      const resp = await api.getOrder(order.id);
-      if (resp.customs_document) {
-        generateCustomsPDF(resp.customs_document, order);
-        success('PDF downloading...');
-      } else {
-        error('No customs document for this order yet.');
+      let docToUse: CustomsDocument | null = null;
+      try {
+        const resp = await api.getOrder(order.id);
+        docToUse = resp.customs_document;
+      } catch (e) {
+        console.warn('Could not fetch order customs document, synthesizing fallback', e);
       }
-    } catch {
-      error('Failed to generate PDF');
+
+      if (!docToUse) {
+        docToUse = createCustomsDocFromOrder(order);
+      }
+
+      generateCustomsPDF(docToUse, order);
+      success('Commercial Invoice PDF downloaded!');
+    } catch (err: any) {
+      console.error('Customs PDF generation error:', err);
+      error(err.message || 'Failed to generate Customs PDF');
     }
   };
 
