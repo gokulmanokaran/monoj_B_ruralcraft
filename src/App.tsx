@@ -104,7 +104,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/artisan/profile" element={<ProtectedRoute requiredRole="artisan"><ArtisanDashboard /></ProtectedRoute>} />
 
       {/* Unified Admin Routes */}
-      <Route path="/admin/login" element={<AdminLoginPage />} />
+      <Route path="/admin/login" element={<Navigate to="/login" replace />} />
       <Route path="/admin" element={<ProtectedAdminRoute><AdminDashboard initialTab="dashboard" /></ProtectedAdminRoute>} />
       <Route path="/admin/dashboard" element={<ProtectedAdminRoute><AdminDashboard initialTab="dashboard" /></ProtectedAdminRoute>} />
       <Route path="/admin/users" element={<ProtectedAdminRoute><AdminDashboard initialTab="users" /></ProtectedAdminRoute>} />
