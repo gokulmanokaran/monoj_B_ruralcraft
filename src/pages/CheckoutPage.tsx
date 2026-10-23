@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, ChevronRight, Loader2 } from 'lucide-react';
+import { CheckCircle2, ChevronRight } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -22,6 +22,42 @@ interface FormData {
 }
 
 const STEPS = ['Customer Info', 'Shipping Address', 'Review Order', 'Confirmation'];
+
+interface InputFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  required?: boolean;
+  placeholder?: string;
+  id?: string;
+}
+
+// Declared outside CheckoutPage so React retains DOM focus and does not remount on keystroke
+const InputField: React.FC<InputFieldProps> = ({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  required = true,
+  placeholder = '',
+  id
+}) => (
+  <div>
+    <label htmlFor={id} className="block text-xs font-semibold text-stone-700 mb-1.5">
+      {label} {required && <span className="text-rose-500">*</span>}
+    </label>
+    <input
+      id={id}
+      type={type}
+      required={required}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#143826]/30 focus:border-[#143826] transition-all"
+    />
+  </div>
+);
 
 export const CheckoutPage: React.FC = () => {
   const { items, totalInr, clearCart } = useCart();
@@ -44,11 +80,26 @@ export const CheckoutPage: React.FC = () => {
     postal_code: ''
   });
 
+  // Sync user info if user was loaded asynchronously
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        full_name: prev.full_name || user.full_name || '',
+        email: prev.email || user.email || '',
+        phone: prev.phone || user.phone || ''
+      }));
+    }
+  }, [user]);
+
   const update = (field: keyof FormData, value: string) =>
     setFormData(prev => ({ ...prev, [field]: value }));
 
   const handlePlaceOrder = async () => {
-    if (!items.length) { error('Cart is empty'); return; }
+    if (!items.length) {
+      error('Cart is empty');
+      return;
+    }
     setSubmitting(true);
     try {
       const resp = await api.placeOrder({
@@ -78,24 +129,6 @@ export const CheckoutPage: React.FC = () => {
       setSubmitting(false);
     }
   };
-
-  const InputField = ({ label, field, type = 'text', required = true, placeholder = '' }: {
-    label: string; field: keyof FormData; type?: string; required?: boolean; placeholder?: string
-  }) => (
-    <div>
-      <label className="block text-xs font-semibold text-stone-700 mb-1.5">
-        {label} {required && <span className="text-rose-500">*</span>}
-      </label>
-      <input
-        type={type}
-        required={required}
-        value={formData[field]}
-        onChange={e => update(field, e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#143826]/30 focus:border-[#143826] transition-all"
-      />
-    </div>
-  );
 
   return (
     <MainLayout>
@@ -130,16 +163,41 @@ export const CheckoutPage: React.FC = () => {
             <motion.div key="step0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <h2 className="font-heading font-black text-xl text-stone-900 mb-5">Customer Information</h2>
               <div className="bg-white rounded-2xl border border-stone-200 p-6 space-y-4">
-                <InputField label="Full Name" field="full_name" placeholder="Johnathan Doe" />
-                <InputField label="Email Address" field="email" type="email" placeholder="you@example.com" />
-                <InputField label="Phone Number" field="phone" type="tel" placeholder="+1 415 555 0192" />
+                <InputField
+                  id="checkout-full-name"
+                  label="Full Name"
+                  value={formData.full_name}
+                  onChange={v => update('full_name', v)}
+                  placeholder="Johnathan Doe"
+                />
+                <InputField
+                  id="checkout-email"
+                  label="Email Address"
+                  value={formData.email}
+                  onChange={v => update('email', v)}
+                  type="email"
+                  placeholder="you@example.com"
+                />
+                <InputField
+                  id="checkout-phone"
+                  label="Phone Number"
+                  value={formData.phone}
+                  onChange={v => update('phone', v)}
+                  type="tel"
+                  placeholder="+1 415 555 0192"
+                />
               </div>
               <button
+                type="button"
+                id="continue-to-shipping-btn"
                 onClick={() => {
-                  if (!formData.full_name || !formData.email || !formData.phone) { error('Please fill all required fields'); return; }
+                  if (!formData.full_name || !formData.email || !formData.phone) {
+                    error('Please fill all required fields');
+                    return;
+                  }
                   setStep(1);
                 }}
-                className="mt-5 w-full py-3.5 bg-[#143826] hover:bg-[#0D2818] text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                className="mt-5 w-full py-3.5 bg-[#143826] hover:bg-[#0D2818] text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
                 Continue to Shipping <ChevronRight className="w-4 h-4" />
               </button>
@@ -151,26 +209,65 @@ export const CheckoutPage: React.FC = () => {
             <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <h2 className="font-heading font-black text-xl text-stone-900 mb-5">International Shipping Address</h2>
               <div className="bg-white rounded-2xl border border-stone-200 p-6 space-y-4">
-                <InputField label="Street Address" field="address" placeholder="450 Mission Street, Apt 12B" />
+                <InputField
+                  id="checkout-address"
+                  label="Street Address"
+                  value={formData.address}
+                  onChange={v => update('address', v)}
+                  placeholder="450 Mission Street, Apt 12B"
+                />
                 <div className="grid grid-cols-2 gap-4">
-                  <InputField label="City" field="city" placeholder="San Francisco" />
-                  <InputField label="State / Province" field="state" placeholder="CA" />
+                  <InputField
+                    id="checkout-city"
+                    label="City"
+                    value={formData.city}
+                    onChange={v => update('city', v)}
+                    placeholder="San Francisco"
+                  />
+                  <InputField
+                    id="checkout-state"
+                    label="State / Province"
+                    value={formData.state}
+                    onChange={v => update('state', v)}
+                    placeholder="CA"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <InputField label="Country" field="country" placeholder="United States" />
-                  <InputField label="Postal Code" field="postal_code" placeholder="94105" />
+                  <InputField
+                    id="checkout-country"
+                    label="Country"
+                    value={formData.country}
+                    onChange={v => update('country', v)}
+                    placeholder="United States"
+                  />
+                  <InputField
+                    id="checkout-postal-code"
+                    label="Postal Code"
+                    value={formData.postal_code}
+                    onChange={v => update('postal_code', v)}
+                    placeholder="94105"
+                  />
                 </div>
               </div>
               <div className="flex gap-3 mt-5">
-                <button onClick={() => setStep(0)} className="px-5 py-3.5 border border-stone-300 rounded-xl font-semibold text-sm hover:bg-stone-50 transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => setStep(0)}
+                  className="px-5 py-3.5 border border-stone-300 rounded-xl font-semibold text-sm hover:bg-stone-50 transition-colors cursor-pointer"
+                >
                   Back
                 </button>
                 <button
+                  type="button"
+                  id="review-order-btn"
                   onClick={() => {
-                    if (!formData.address || !formData.city || !formData.country) { error('Please fill shipping address'); return; }
+                    if (!formData.address || !formData.city || !formData.country) {
+                      error('Please fill shipping address');
+                      return;
+                    }
                     setStep(2);
                   }}
-                  className="flex-1 py-3.5 bg-[#143826] hover:bg-[#0D2818] text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  className="flex-1 py-3.5 bg-[#143826] hover:bg-[#0D2818] text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md"
                 >
                   Review Order <ChevronRight className="w-4 h-4" />
                 </button>
@@ -186,7 +283,10 @@ export const CheckoutPage: React.FC = () => {
               <div className="space-y-3 mb-4">
                 {items.map(item => (
                   <div key={item.product.id} className="flex gap-3 p-3 bg-white rounded-xl border border-stone-200">
-                    <img src={item.product.images?.[0]} alt={item.product.name} className="w-14 h-14 rounded-lg object-cover"
+                    <img
+                      src={item.product.images?.[0]}
+                      alt={item.product.name}
+                      className="w-14 h-14 rounded-lg object-cover"
                       onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1596178065887-1198b6148b2b?q=80&w=100&auto=format&fit=crop'; }}
                     />
                     <div className="flex-1">
@@ -215,15 +315,21 @@ export const CheckoutPage: React.FC = () => {
               </div>
 
               <div className="flex gap-3">
-                <button onClick={() => setStep(1)} className="px-5 py-3.5 border border-stone-300 rounded-xl font-semibold text-sm hover:bg-stone-50 transition-colors cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="px-5 py-3.5 border border-stone-300 rounded-xl font-semibold text-sm hover:bg-stone-50 transition-colors cursor-pointer"
+                >
                   Back
                 </button>
                 <button
+                  type="button"
+                  id="place-order-btn"
                   onClick={handlePlaceOrder}
                   disabled={submitting}
-                  className="flex-1 py-3.5 bg-[#143826] hover:bg-[#0D2818] text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                  className="flex-1 py-3.5 bg-[#143826] hover:bg-[#0D2818] text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-60"
                 >
-                  {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Placing Order...</> : '✅ Place Order (Simulated)'}
+                  {submitting ? 'Placing Order...' : 'Place International Order'}
                 </button>
               </div>
             </motion.div>
@@ -232,29 +338,28 @@ export const CheckoutPage: React.FC = () => {
           {/* Step 3: Confirmation */}
           {step === 3 && (
             <motion.div key="step3" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-10">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', damping: 15 }}
-                className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5"
-              >
-                <CheckCircle2 className="w-10 h-10 text-emerald-600" />
-              </motion.div>
-              <h2 className="font-heading font-black text-2xl text-stone-900 mb-2">Order Confirmed! 🎉</h2>
-              <p className="text-stone-500 mb-2">Your order has been placed successfully.</p>
-              <div className="inline-flex px-4 py-2 bg-[#143826]/10 text-[#143826] font-mono font-bold rounded-xl text-sm mb-6">
-                {orderId}
+              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-8 h-8 text-emerald-600" />
               </div>
-              <p className="text-sm text-stone-500 mb-6">
-                ✅ Customs documentation & Commercial Invoice have been auto-generated.<br />
-                Check your order details to download the PDF.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <button onClick={() => navigate('/account/orders')} className="px-6 py-3 bg-[#143826] text-white rounded-xl font-bold hover:bg-[#0D2818] transition-colors cursor-pointer">
-                  View My Orders
-                </button>
-                <button onClick={() => navigate('/explore')} className="px-6 py-3 border border-stone-300 text-stone-700 rounded-xl font-semibold hover:bg-stone-50 transition-colors cursor-pointer">
+              <h2 className="font-heading font-black text-2xl text-stone-900 mb-2">Order Confirmed!</h2>
+              <p className="text-stone-500 text-sm mb-1">Thank you for supporting rural artisan communities.</p>
+              {orderId && (
+                <p className="text-xs font-mono font-bold text-[#143826] bg-[#143826]/10 px-3 py-1.5 rounded-full inline-block mb-6">
+                  Order #{orderId}
+                </p>
+              )}
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => navigate('/explore')}
+                  className="px-6 py-3 border border-stone-200 rounded-xl text-sm font-semibold hover:bg-stone-50 cursor-pointer"
+                >
                   Continue Shopping
+                </button>
+                <button
+                  onClick={() => navigate('/account/orders')}
+                  className="px-6 py-3 bg-[#143826] text-white rounded-xl text-sm font-bold hover:bg-[#0D2818] cursor-pointer"
+                >
+                  View My Orders
                 </button>
               </div>
             </motion.div>
