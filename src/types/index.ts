@@ -6,6 +6,7 @@ export interface User {
   full_name: string;
   phone?: string;
   role: UserRole;
+  avatar_url?: string;
 }
 
 export interface Profile {
@@ -19,6 +20,10 @@ export interface Profile {
   country?: string;
   city?: string;
   address_line?: string;
+  designation?: string;
+  department?: string;
+  iec_code?: string;
+  gstin?: string;
 }
 
 export interface Artisan {

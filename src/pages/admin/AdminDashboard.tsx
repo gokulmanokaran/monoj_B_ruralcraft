@@ -9,7 +9,8 @@ import {
   Globe, Settings, LogOut, Plus, ChevronRight,
   ArrowUp, DollarSign, Download, Search, RefreshCw,
   ExternalLink, CheckCircle2, AlertCircle, X, ShieldCheck,
-  Trash2, Eye, Upload, Sparkles, Image as ImageIcon
+  Trash2, Eye, Upload, Sparkles, Image as ImageIcon,
+  UserCheck, Edit3, Award, Building, MapPin, Mail, Phone, Check, ShieldAlert
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -22,7 +23,7 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'dashboard' }) => {
-  const { user, logout } = useAuth();
+  const { user, profile, updateProfile, logout } = useAuth();
   const { success, error, info } = useToast();
   const navigate = useNavigate();
 
@@ -70,6 +71,63 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
     country_rules: 'General duty 0-5%',
     duty_notes: 'Standard artisan classification'
   });
+
+  const AVATAR_PRESETS = [
+    { label: 'Customs Officer', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80' },
+    { label: 'Executive Director', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80' },
+    { label: 'Trade Specialist', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80' },
+    { label: 'Artisan Lead', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80' },
+    { label: 'Operations Lead', url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=400&q=80' }
+  ];
+
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [editProfileData, setEditProfileData] = useState({
+    full_name: '',
+    phone: '',
+    designation: '',
+    department: '',
+    office_location: '',
+    city: '',
+    country: 'India',
+    address_line: '',
+    iec_code: '',
+    gstin: '',
+    bio: '',
+    avatar_url: ''
+  });
+
+  const handleOpenEditProfile = () => {
+    setEditProfileData({
+      full_name: profile?.full_name || user?.full_name || 'Customs Administrator',
+      phone: profile?.phone || user?.phone || '+91 98765 43210',
+      designation: profile?.designation || 'Senior International Customs Officer & Platform Director',
+      department: profile?.department || 'RuralCraft Global Trade & Customs Operations',
+      office_location: profile?.city ? `${profile.city}, ${profile.country || 'India'}` : 'New Delhi, India',
+      city: profile?.city || 'New Delhi',
+      country: profile?.country || 'India',
+      address_line: profile?.address_line || 'Artisan Enclave, Sector 4, New Delhi 110001, India',
+      iec_code: profile?.iec_code || '0519048821',
+      gstin: profile?.gstin || '07AAAAA0000A1Z5',
+      bio: profile?.bio || 'Certified customs operations officer orchestrating worldwide export clearance and cross-border trade for verified rural Indian artisan clusters.',
+      avatar_url: profile?.avatar_url || user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'
+    });
+    setIsEditProfileOpen(true);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    try {
+      await updateProfile(editProfileData);
+      success('Admin Profile updated successfully!');
+      setIsEditProfileOpen(false);
+    } catch (err: any) {
+      error(err.message || 'Failed to update profile');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   // Sync prop changes
   useEffect(() => {
@@ -320,6 +378,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
 
   const sidebarItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'profile', icon: UserCheck, label: 'Admin Profile' },
     { id: 'users', icon: Users, label: 'Users & Artisans', count: artisans.length },
     { id: 'products', icon: Package, label: 'Products Catalog', count: products.length },
     { id: 'orders', icon: ShoppingBag, label: 'Global Orders', count: orders.length },
@@ -368,12 +427,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
         <aside className="w-64 bg-[#0D2818] text-white flex flex-col min-h-[calc(100vh-41px)] shrink-0 hidden md:flex border-r border-white/5">
           <div className="p-5 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#DDA15E] flex items-center justify-center font-bold text-[#0D2818]">
-                RC
+              <div className="w-9 h-9 rounded-xl bg-[#DDA15E] flex items-center justify-center font-bold text-[#0D2818] overflow-hidden shrink-0">
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="Admin" className="w-full h-full object-cover" />
+                ) : (
+                  'RC'
+                )}
               </div>
-              <div>
-                <div className="font-heading font-bold text-sm text-white">Customs Admin</div>
-                <div className="text-[10px] text-[#DDA15E] font-medium">Platform Operations</div>
+              <div className="min-w-0">
+                <div className="font-heading font-bold text-sm text-white truncate">
+                  {profile?.full_name || 'Customs Admin'}
+                </div>
+                <div className="text-[10px] text-[#DDA15E] font-medium truncate">
+                  {profile?.designation || 'Platform Operations'}
+                </div>
               </div>
             </div>
           </div>
@@ -404,16 +471,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
             ))}
           </nav>
 
-          <div className="p-4 border-t border-white/10">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-[#DDA15E] flex items-center justify-center text-[#0D2818] text-xs font-bold shrink-0">
-                {user?.full_name?.[0] || 'A'}
+          <div className="p-3 border-t border-white/10">
+            <button
+              onClick={() => setActiveTab('profile')}
+              className={`w-full flex items-center gap-2.5 p-2 rounded-xl transition-all text-left cursor-pointer ${
+                activeTab === 'profile'
+                  ? 'bg-[#DDA15E]/20 border border-[#DDA15E]/40 text-white'
+                  : 'hover:bg-white/8 text-stone-300 hover:text-white'
+              }`}
+            >
+              <div className="w-8 h-8 rounded-full bg-[#DDA15E] flex items-center justify-center text-[#0D2818] text-xs font-bold shrink-0 overflow-hidden">
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="Admin" className="w-full h-full object-cover" />
+                ) : (
+                  user?.full_name?.[0] || 'A'
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold text-white truncate">{user?.full_name || 'Admin User'}</div>
-                <div className="text-[10px] text-stone-400 truncate">{user?.email}</div>
+                <div className="text-xs font-bold text-white truncate">
+                  {profile?.full_name || user?.full_name || 'Administrator'}
+                </div>
+                <div className="text-[10px] text-stone-400 truncate">{user?.email || 'admin@gmail.com'}</div>
               </div>
-            </div>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#DDA15E]/20 text-[#DDA15E] border border-[#DDA15E]/30 shrink-0">
+                Profile
+              </span>
+            </button>
           </div>
         </aside>
 
@@ -571,7 +654,254 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
             </div>
           )}
 
-          {/* TAB 2: USERS & ARTISANS */}
+          {/* TAB 2: ADMIN PROFILE & TRADE CREDENTIALS */}
+          {activeTab === 'profile' && (
+            <div className="space-y-6">
+              {/* Header banner */}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h1 className="font-heading font-black text-2xl text-stone-900 flex items-center gap-2">
+                    <UserCheck className="w-6 h-6 text-[#143826]" />
+                    Admin Profile & Customs Officer Credentials
+                  </h1>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Manage platform administrator identity, export licenses, IEC authority, and digital credentials
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleOpenEditProfile}
+                    className="px-4 py-2 bg-[#143826] hover:bg-[#0D2818] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-[#DDA15E]" />
+                    Edit Admin Profile
+                  </button>
+                </div>
+              </div>
+
+              {/* Profile Hero Card */}
+              <div className="bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 shadow-sm">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b border-stone-100">
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start md:items-center gap-5 text-center sm:text-left">
+                    <div className="relative">
+                      <div className="w-24 h-24 rounded-2xl bg-[#0D2818] border-4 border-[#DDA15E]/40 overflow-hidden shadow-lg flex items-center justify-center text-white text-3xl font-black">
+                        {profile?.avatar_url ? (
+                          <img
+                            src={profile.avatar_url}
+                            alt={profile?.full_name || 'Admin'}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          user?.full_name?.[0] || 'A'
+                        )}
+                      </div>
+                      <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-[10px] text-white font-bold" title="Super Admin Online">
+                        ✓
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1.5">
+                        <h2 className="font-heading font-black text-xl text-stone-900">
+                          {profile?.full_name || user?.full_name || 'Customs Administrator'}
+                        </h2>
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold inline-flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3 text-emerald-600" /> Super Admin
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-[#143826]/10 text-[#143826] text-[10px] font-bold">
+                          Customs Officer Level 1
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-[#DDA15E]">
+                        {profile?.designation || 'Senior International Customs Officer & Platform Director'}
+                      </p>
+                      <p className="text-xs text-stone-500 mt-1">
+                        {profile?.department || 'RuralCraft Global Trade & Customs Operations'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                    <button
+                      onClick={handleOpenEditProfile}
+                      className="px-4 py-2.5 rounded-xl border border-stone-200 hover:border-stone-300 text-xs font-bold text-stone-700 hover:bg-stone-50 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-stone-500" />
+                      Update Details
+                    </button>
+                  </div>
+                </div>
+
+                {/* Profile Meta Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-6">
+                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-100">
+                    <div className="flex items-center gap-2 text-stone-400 text-xs mb-1">
+                      <Mail className="w-3.5 h-3.5 text-[#143826]" /> Official Email
+                    </div>
+                    <div className="font-mono text-xs font-bold text-stone-800 truncate">
+                      {user?.email || 'admin@gmail.com'}
+                    </div>
+                    <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">Verified Primary Account</div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-100">
+                    <div className="flex items-center gap-2 text-stone-400 text-xs mb-1">
+                      <Phone className="w-3.5 h-3.5 text-[#143826]" /> Direct Phone
+                    </div>
+                    <div className="font-mono text-xs font-bold text-stone-800">
+                      {profile?.phone || user?.phone || '+91 98765 43210'}
+                    </div>
+                    <div className="text-[10px] text-stone-400 mt-0.5">Secured 2FA Channel</div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-100">
+                    <div className="flex items-center gap-2 text-stone-400 text-xs mb-1">
+                      <MapPin className="w-3.5 h-3.5 text-[#143826]" /> Office Location
+                    </div>
+                    <div className="text-xs font-bold text-stone-800">
+                      {profile?.city || 'New Delhi'}, {profile?.country || 'India'}
+                    </div>
+                    <div className="text-[10px] text-stone-400 mt-0.5 truncate">
+                      {profile?.address_line || 'Artisan Enclave, Sector 4'}
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-stone-50 border border-stone-100">
+                    <div className="flex items-center gap-2 text-stone-400 text-xs mb-1">
+                      <Building className="w-3.5 h-3.5 text-[#143826]" /> Customs Hub
+                    </div>
+                    <div className="text-xs font-bold text-stone-800">
+                      INDEL / INCOK Cargo Complex
+                    </div>
+                    <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">Direct Air Clearance Gateway</div>
+                  </div>
+                </div>
+
+                {/* Bio / Scope */}
+                {profile?.bio && (
+                  <div className="mt-6 pt-5 border-t border-stone-100 text-xs text-stone-600 leading-relaxed bg-[#143826]/5 p-4 rounded-2xl border border-[#143826]/10">
+                    <div className="font-bold text-[#143826] mb-1 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[#DDA15E]" /> Authority & Platform Mission Statement
+                    </div>
+                    {profile.bio}
+                  </div>
+                )}
+              </div>
+
+              {/* Two Column Grid: Customs Credentials & Operations Metrics */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Customs & Export Credentials Card */}
+                <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-stone-100">
+                    <h3 className="font-heading font-bold text-base text-stone-900 flex items-center gap-2">
+                      <Award className="w-4 h-4 text-[#DDA15E]" />
+                      International Trade & Customs Credentials
+                    </h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
+                      DGFT Verified
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-stone-50 border border-stone-100">
+                      <div>
+                        <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">DGFT IEC Code (Import Export Code)</div>
+                        <div className="font-mono text-sm font-bold text-[#143826]">
+                          {profile?.iec_code || '0519048821'}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                        Active Master IEC
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-stone-50 border border-stone-100">
+                      <div>
+                        <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">GSTIN Trade Registration</div>
+                        <div className="font-mono text-sm font-bold text-[#143826]">
+                          {profile?.gstin || '07AAAAA0000A1Z5'}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                        Central Goods & Services Tax
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-stone-50 border border-stone-100">
+                      <div>
+                        <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Digital Signature Authorization</div>
+                        <div className="text-xs font-bold text-stone-800">
+                          {profile?.full_name || 'Customs Administrator'} (RuralCraft Consortia)
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
+                        Class 3 Commercial
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-800 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                    <span>
+                      These credentials appear automatically on all generated <strong>Commercial Invoices</strong> and <strong>Customs Declarations (CN22/CN23)</strong> for international buyers.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Operations & Platform Authority Scope */}
+                <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-stone-100">
+                    <h3 className="font-heading font-bold text-base text-stone-900 flex items-center gap-2">
+                      <LayoutDashboard className="w-4 h-4 text-[#143826]" />
+                      Super Admin Platform Oversight
+                    </h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-[#143826]/10 text-[#143826] rounded-full">
+                      Live Database Sync
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-100 text-center">
+                      <div className="text-2xl font-black text-[#143826] font-mono">{products.length}</div>
+                      <div className="text-[11px] text-stone-500 font-semibold mt-0.5">Products in Catalog</div>
+                    </div>
+
+                    <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-100 text-center">
+                      <div className="text-2xl font-black text-[#2D6A4F] font-mono">{artisans.length}</div>
+                      <div className="text-[11px] text-stone-500 font-semibold mt-0.5">Verified Rural Artisans</div>
+                    </div>
+
+                    <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-100 text-center">
+                      <div className="text-2xl font-black text-[#BC6C25] font-mono">{orders.length}</div>
+                      <div className="text-[11px] text-stone-500 font-semibold mt-0.5">Orders Processed</div>
+                    </div>
+
+                    <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-100 text-center">
+                      <div className="text-2xl font-black text-[#DDA15E] font-mono">{customsDocs.length}</div>
+                      <div className="text-[11px] text-stone-500 font-semibold mt-0.5">Customs Documents</div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-stone-50 rounded-xl border border-stone-100 text-xs text-stone-500 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span>Database Role:</span>
+                      <strong className="text-stone-800 font-mono">admin (Row-Level Security Bypass)</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Auth Provider:</span>
+                      <strong className="text-stone-800">Supabase Auth & Local Failover</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>HS Tariff Engine:</span>
+                      <strong className="text-stone-800">Automated 6-Digit HS Matcher</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: USERS & ARTISANS */}
           {activeTab === 'users' && (
             <div>
               <div className="mb-6">
@@ -1381,6 +1711,249 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
                       <>
                         <Upload className="w-3.5 h-3.5 text-[#DDA15E]" />
                         Upload & Publish to Supabase
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Edit Admin Profile */}
+      <AnimatePresence>
+        {isEditProfileOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto my-6"
+            >
+              <div className="flex items-center justify-between pb-4 mb-5 border-b border-stone-100">
+                <div>
+                  <h3 className="font-heading font-black text-xl text-stone-900 flex items-center gap-2">
+                    <Edit3 className="w-5 h-5 text-[#143826]" />
+                    Edit Admin Profile & Trade Credentials
+                  </h3>
+                  <p className="text-xs text-stone-400 mt-0.5">
+                    Update your administrator identity, contact, designation, and customs authority details
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsEditProfileOpen(false)}
+                  className="text-stone-400 hover:text-stone-600 p-1 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                {/* Avatar selection & preview */}
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-2">
+                    Profile Avatar / Photo
+                  </label>
+                  <div className="flex items-center gap-4 mb-3">
+                    <div className="w-16 h-16 rounded-2xl bg-[#0D2818] overflow-hidden border-2 border-[#DDA15E] shrink-0 flex items-center justify-center text-white text-xl font-bold">
+                      {editProfileData.avatar_url ? (
+                        <img src={editProfileData.avatar_url} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        editProfileData.full_name?.[0] || 'A'
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-xs text-stone-500 mb-1 font-medium">Quick Preset Avatars:</div>
+                      <div className="flex flex-wrap gap-2">
+                        {AVATAR_PRESETS.map((p, idx) => (
+                          <button
+                            type="button"
+                            key={idx}
+                            onClick={() => setEditProfileData({ ...editProfileData, avatar_url: p.url })}
+                            className={`w-9 h-9 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                              editProfileData.avatar_url === p.url
+                                ? 'border-[#143826] ring-2 ring-[#143826]/30 scale-105'
+                                : 'border-stone-200 opacity-70 hover:opacity-100'
+                            }`}
+                            title={p.label}
+                          >
+                            <img src={p.url} alt={p.label} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <input
+                      type="url"
+                      placeholder="Or enter custom image URL: https://..."
+                      value={editProfileData.avatar_url}
+                      onChange={e => setEditProfileData({ ...editProfileData, avatar_url: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Name & Phone */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Administrator Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Customs Administrator"
+                      value={editProfileData.full_name}
+                      onChange={e => setEditProfileData({ ...editProfileData, full_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Phone Number *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="+91 98765 43210"
+                      value={editProfileData.phone}
+                      onChange={e => setEditProfileData({ ...editProfileData, phone: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Designation & Department */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Official Designation / Job Title
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Senior International Customs Officer"
+                      value={editProfileData.designation}
+                      onChange={e => setEditProfileData({ ...editProfileData, designation: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Department / Organization
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="RuralCraft Global Trade & Customs Operations"
+                      value={editProfileData.department}
+                      onChange={e => setEditProfileData({ ...editProfileData, department: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Address & City */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Office Address
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Artisan Enclave, Sector 4, New Delhi 110001"
+                      value={editProfileData.address_line}
+                      onChange={e => setEditProfileData({ ...editProfileData, address_line: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      City
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="New Delhi"
+                      value={editProfileData.city}
+                      onChange={e => setEditProfileData({ ...editProfileData, city: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Customs Credentials: IEC Code & GSTIN */}
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 space-y-3">
+                  <div className="text-xs font-bold text-[#143826] flex items-center gap-1.5">
+                    <Award className="w-3.5 h-3.5 text-[#DDA15E]" /> Export & Customs Authority Credentials
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-stone-600 mb-1">
+                        DGFT IEC Code
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="0519048821"
+                        value={editProfileData.iec_code}
+                        onChange={e => setEditProfileData({ ...editProfileData, iec_code: e.target.value })}
+                        className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs font-mono bg-white focus:ring-2 focus:ring-[#143826]/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-stone-600 mb-1">
+                        GSTIN Registration Number
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="07AAAAA0000A1Z5"
+                        value={editProfileData.gstin}
+                        onChange={e => setEditProfileData({ ...editProfileData, gstin: e.target.value })}
+                        className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs font-mono bg-white focus:ring-2 focus:ring-[#143826]/20"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bio */}
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Bio / Authority Statement
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Describe your role, authority scope, or export clearance statement..."
+                    value={editProfileData.bio}
+                    onChange={e => setEditProfileData({ ...editProfileData, bio: e.target.value })}
+                    className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                  />
+                </div>
+
+                {/* Buttons */}
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditProfileOpen(false)}
+                    className="px-4 py-2 text-xs font-bold text-stone-600 hover:text-stone-800 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingProfile}
+                    className="px-5 py-2.5 bg-[#143826] hover:bg-[#0D2818] text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {savingProfile ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-[#DDA15E]" /> Save Profile Changes
                       </>
                     )}
                   </button>

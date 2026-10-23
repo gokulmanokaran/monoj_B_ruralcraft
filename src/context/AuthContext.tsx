@@ -4,21 +4,42 @@ import { api } from '../services/api';
 import type { User, Profile, Artisan, UserRole } from '../types';
 
 const LOCAL_ADMIN_KEY = 'rc_admin_session';
+const LOCAL_ADMIN_PROFILE_KEY = 'rc_admin_profile_data';
 
 const FIXED_ADMIN_USER: User = {
   id: 'admin-fixed-id',
   email: 'admin@gmail.com',
-  full_name: 'Administrator',
+  full_name: 'Customs Administrator',
   role: 'admin',
-  phone: '+91 98765 43210'
+  phone: '+91 98765 43210',
+  avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'
 };
 
 const FIXED_ADMIN_PROFILE: Profile = {
   id: 'admin-fixed-id',
-  full_name: 'Administrator',
+  full_name: 'Customs Administrator',
   role: 'admin',
   phone: '+91 98765 43210',
-  country: 'India'
+  country: 'India',
+  city: 'New Delhi',
+  address_line: 'Artisan Enclave, Sector 4, New Delhi 110001, India',
+  designation: 'Senior International Customs Officer & Platform Director',
+  department: 'RuralCraft Global Trade & Customs Operations',
+  iec_code: '0519048821',
+  gstin: '07AAAAA0000A1Z5',
+  bio: 'Certified customs operations officer orchestrating worldwide export clearance and cross-border trade for verified rural Indian artisan clusters.',
+  avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'
+};
+
+export const getStoredAdminProfile = (): Profile => {
+  if (typeof window === 'undefined') return FIXED_ADMIN_PROFILE;
+  try {
+    const raw = localStorage.getItem(LOCAL_ADMIN_PROFILE_KEY);
+    if (raw) {
+      return { ...FIXED_ADMIN_PROFILE, ...JSON.parse(raw) };
+    }
+  } catch {}
+  return FIXED_ADMIN_PROFILE;
 };
 
 interface AuthContextType {
@@ -31,6 +52,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, pass: string) => Promise<{ user: User; profile: Profile; artisan: Artisan | null }>;
   logout: () => Promise<void>;
+  updateProfile: (updated: Partial<Profile>) => Promise<Profile>;
   updateUserArtisan: (artisan: Artisan) => void;
   refreshUser: () => Promise<void>;
 }
@@ -71,29 +93,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           art = artData;
         }
 
+        const storedAdmin = isAdminEmail ? getStoredAdminProfile() : null;
         const authUser: User = {
           id: sessionUser.id,
           email: sessionUser.email || '',
-          full_name: prof?.full_name || (isAdminEmail ? 'Administrator' : 'Customer'),
-          phone: prof?.phone,
-          role
+          full_name: prof?.full_name || storedAdmin?.full_name || (isAdminEmail ? 'Customs Administrator' : 'Customer'),
+          phone: prof?.phone || storedAdmin?.phone,
+          role,
+          avatar_url: prof?.avatar_url || storedAdmin?.avatar_url
         };
 
+        const resolvedProfile: Profile = isAdminEmail
+          ? {
+              ...storedAdmin,
+              ...(prof || {}),
+              id: sessionUser.id,
+              full_name: prof?.full_name || storedAdmin?.full_name || authUser.full_name,
+              role: 'admin'
+            }
+          : (prof || {
+              id: sessionUser.id,
+              full_name: authUser.full_name,
+              role,
+              country: 'India'
+            });
+
         setUser(authUser);
-        setProfile(prof || {
-          id: sessionUser.id,
-          full_name: authUser.full_name,
-          role,
-          country: 'India'
-        });
+        setProfile(resolvedProfile);
         setArtisan(art);
         return;
       }
 
       // 2. Check local admin session fallback
       if (typeof window !== 'undefined' && localStorage.getItem(LOCAL_ADMIN_KEY) === 'true') {
-        setUser(FIXED_ADMIN_USER);
-        setProfile(FIXED_ADMIN_PROFILE);
+        const storedAdmin = getStoredAdminProfile();
+        setUser({
+          ...FIXED_ADMIN_USER,
+          full_name: storedAdmin.full_name || FIXED_ADMIN_USER.full_name,
+          phone: storedAdmin.phone || FIXED_ADMIN_USER.phone,
+          avatar_url: storedAdmin.avatar_url || FIXED_ADMIN_USER.avatar_url
+        });
+        setProfile(storedAdmin);
         setArtisan(null);
         return;
       }
@@ -132,15 +172,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userEmail = (session.user.email || '').trim().toLowerCase();
         const isAdminEmail = userEmail === 'admin@gmail.com';
         const role: UserRole = isAdminEmail ? 'admin' : (prof?.role === 'artisan' ? 'artisan' : 'customer');
+        const storedAdmin = isAdminEmail ? getStoredAdminProfile() : null;
 
         setUser({
           id: session.user.id,
           email: session.user.email || '',
-          full_name: prof?.full_name || (isAdminEmail ? 'Administrator' : 'Customer'),
-          phone: prof?.phone,
-          role
+          full_name: prof?.full_name || storedAdmin?.full_name || (isAdminEmail ? 'Customs Administrator' : 'Customer'),
+          phone: prof?.phone || storedAdmin?.phone,
+          role,
+          avatar_url: prof?.avatar_url || storedAdmin?.avatar_url
         });
-        setProfile(prof || null);
+        setProfile(isAdminEmail ? { ...storedAdmin, ...(prof || {}), role: 'admin' } : (prof || null));
         setLoading(false);
       } else if (event === 'SIGNED_OUT') {
         if (typeof window !== 'undefined' && localStorage.getItem(LOCAL_ADMIN_KEY) === 'true') {
@@ -235,12 +277,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (typeof window !== 'undefined') {
           localStorage.setItem(LOCAL_ADMIN_KEY, 'true');
         }
-        setUser(FIXED_ADMIN_USER);
-        setProfile(FIXED_ADMIN_PROFILE);
+        const storedAdmin = getStoredAdminProfile();
+        const adminUser: User = {
+          ...FIXED_ADMIN_USER,
+          full_name: storedAdmin.full_name || FIXED_ADMIN_USER.full_name,
+          phone: storedAdmin.phone || FIXED_ADMIN_USER.phone,
+          avatar_url: storedAdmin.avatar_url || FIXED_ADMIN_USER.avatar_url
+        };
+        setUser(adminUser);
+        setProfile(storedAdmin);
         setArtisan(null);
         return {
-          user: FIXED_ADMIN_USER,
-          profile: FIXED_ADMIN_PROFILE,
+          user: adminUser,
+          profile: storedAdmin,
           artisan: null
         };
       }
@@ -267,6 +316,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateProfile = async (updated: Partial<Profile>): Promise<Profile> => {
+    const isCurrentAdmin = (user?.role === 'admin') || (profile?.role === 'admin') || (user?.email === 'admin@gmail.com');
+    const baseProfile = profile || (isCurrentAdmin ? getStoredAdminProfile() : {
+      id: user?.id || 'user-id',
+      full_name: user?.full_name || 'User',
+      role: (user?.role || 'customer') as UserRole
+    });
+
+    const merged: Profile = {
+      ...baseProfile,
+      ...updated,
+      id: baseProfile.id,
+      role: baseProfile.role
+    };
+
+    // 1. Persist to Supabase if session active
+    if (user?.id && user.id !== 'admin-fixed-id') {
+      try {
+        await supabase
+          .from('profiles')
+          .upsert({
+            id: user.id,
+            full_name: merged.full_name,
+            phone: merged.phone,
+            bio: merged.bio,
+            avatar_url: merged.avatar_url,
+            country: merged.country,
+            city: merged.city,
+            address_line: merged.address_line,
+            role: merged.role
+          });
+      } catch (e) {
+        console.warn('Supabase profile upsert warning:', e);
+      }
+    }
+
+    // 2. Persist locally for admin profile data
+    if (isCurrentAdmin && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(LOCAL_ADMIN_PROFILE_KEY, JSON.stringify(merged));
+      } catch {}
+    }
+
+    // 3. Update React states
+    setProfile(merged);
+    if (user) {
+      setUser({
+        ...user,
+        full_name: merged.full_name || user.full_name,
+        phone: merged.phone || user.phone,
+        avatar_url: merged.avatar_url || user.avatar_url
+      });
+    }
+
+    return merged;
+  };
+
   const updateUserArtisan = (newArtisan: Artisan) => {
     setArtisan(newArtisan);
   };
@@ -283,7 +389,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{
       user, profile, artisan, role,
       isAuthenticated, isAdmin, loading,
-      login, logout, updateUserArtisan, refreshUser
+      login, logout, updateProfile, updateUserArtisan, refreshUser
     }}>
       {children}
     </AuthContext.Provider>
