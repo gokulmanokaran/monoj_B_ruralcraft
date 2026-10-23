@@ -12,21 +12,6 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   login: (email: string, pass: string) => Promise<{ user: User; profile: Profile; artisan: Artisan | null }>;
-  register: (data: {
-    email: string;
-    password: string;
-    full_name: string;
-    phone?: string;
-    role?: string;
-    brand_name?: string;
-    craft_type?: string;
-    location?: string;
-  }) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  verifyOtp: (email: string, token: string, pendingArtisan?: {
-    brand_name: string; craft_type: string; location: string; phone: string; full_name: string;
-  } | null) => Promise<{ user: User; profile: Profile; artisan: Artisan | null }>;
-  resendOtp: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserArtisan: (artisan: Artisan) => void;
   refreshUser: () => Promise<void>;
@@ -52,8 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
         setArtisan(null);
       }
-    } catch (err) {
-      console.warn('Session check warning:', err);
+    } catch {
       setUser(null);
       setProfile(null);
       setArtisan(null);
@@ -61,28 +45,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    let initialized = false;
+    let ready = false;
 
     const init = async () => {
       await loadUser();
       setLoading(false);
-      initialized = true;
+      ready = true;
     };
 
     init();
 
-    // Listen to Supabase auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!initialized) return; // avoid double-loading on startup
+      if (!ready) return;
 
-      if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
-        if (session?.user) {
-          const me = await api.getMe();
-          if (me) {
-            setUser(me.user);
-            setProfile(me.profile);
-            setArtisan(me.artisan);
-          }
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') && session?.user) {
+        const me = await api.getMe();
+        if (me) {
+          setUser(me.user);
+          setProfile(me.profile);
+          setArtisan(me.artisan);
         }
         setLoading(false);
       } else if (event === 'SIGNED_OUT') {
@@ -93,9 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    return () => { authListener.subscription.unsubscribe(); };
   }, []);
 
   const login = async (email: string, pass: string) => {
@@ -109,81 +88,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  };
-
-  const register = async (data: {
-    email: string;
-    password: string;
-    full_name: string;
-    phone?: string;
-    role?: string;
-    brand_name?: string;
-    craft_type?: string;
-    location?: string;
-  }) => {
-    // Just call signUp — profile is created by DB trigger on_auth_user_created
-    // Session won't be active until email is verified
-    await api.register(data);
-    // Don't set user here — wait for OTP verification
-  };
-
-  const loginWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        }
-      }
-    });
-    if (error) throw new Error(error.message);
-    // Redirect happens automatically — no need to handle state here
-  };
-
-  const verifyOtp = async (
-    email: string,
-    token: string,
-    pendingArtisan?: {
-      brand_name: string; craft_type: string; location: string; phone: string; full_name: string;
-    } | null
-  ) => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email,
-        token,
-        type: 'signup'
-      });
-
-      if (error) throw new Error(error.message);
-      if (!data.user) throw new Error('Verification failed. Please try again.');
-
-      // After verification, ensure profile exists (trigger may have created it already)
-      // If artisan, create artisan record now
-      if (pendingArtisan) {
-        await api.ensureArtisanRecord(data.user.id, pendingArtisan);
-      }
-
-      const me = await api.getMe();
-      if (!me) throw new Error('Could not load user profile after verification.');
-
-      setUser(me.user);
-      setProfile(me.profile);
-      setArtisan(me.artisan);
-      return me;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resendOtp = async (email: string) => {
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email,
-    });
-    if (error) throw new Error(error.message);
   };
 
   const logout = async () => {
@@ -211,39 +115,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const role = user ? user.role : null;
+  const role = user?.role ?? null;
   const isAuthenticated = !!user;
   const isAdmin = role === 'admin';
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        artisan,
-        role,
-        isAuthenticated,
-        isAdmin,
-        loading,
-        login,
-        register,
-        loginWithGoogle,
-        verifyOtp,
-        resendOtp,
-        logout,
-        updateUserArtisan,
-        refreshUser
-      }}
-    >
+    <AuthContext.Provider value={{
+      user, profile, artisan, role,
+      isAuthenticated, isAdmin, loading,
+      login, logout, updateUserArtisan, refreshUser
+    }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
 };
