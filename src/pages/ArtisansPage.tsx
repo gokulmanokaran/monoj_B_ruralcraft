@@ -31,6 +31,15 @@ export const ArtisansPage: React.FC = () => {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
             {[1,2,3,4].map(i => <div key={i} className="h-64 bg-stone-200 rounded-2xl" />)}
           </div>
+        ) : artisans.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center gap-3 bg-white rounded-3xl border border-stone-200 p-8 max-w-lg mx-auto">
+            <div className="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center text-3xl">🧑‍🎨</div>
+            <h3 className="font-heading font-bold text-xl text-stone-700">No artisans found</h3>
+            <p className="text-sm text-stone-400">Rural craft masters registered on the platform will appear here.</p>
+            <Link to="/register?role=artisan" className="mt-2 px-5 py-2.5 bg-[#143826] text-white rounded-xl text-xs font-bold hover:bg-[#0D2818] transition-colors">
+              Become an Artisan
+            </Link>
+          </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {artisans.map((artisan, i) => (

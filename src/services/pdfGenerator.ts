@@ -249,12 +249,12 @@ export function generateCustomsPDF(doc: CustomsDocument, order?: Order) {
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(7);
   pdf.setTextColor(goldSand[0], goldSand[1], goldSand[2]);
-  pdf.text('IMPORTANT CLASSIFICATION NOTICE (DEMO / STUDENT PLATFORM):', 17, discY + 4);
+  pdf.text('IMPORTANT CLASSIFICATION NOTICE:', 17, discY + 4);
 
   pdf.setFont('helvetica', 'normal');
   pdf.setTextColor(darkCharcoal[0], darkCharcoal[1], darkCharcoal[2]);
   pdf.text(
-    'The HS codes shown are system suggestions generated based on artisan product categories and keywords. This document is part of a student project demo. HS codes must be verified with an authorized customs broker prior to international shipping.',
+    'The HS codes shown are system suggestions generated based on artisan product categories and keywords. HS codes must be verified with an authorized customs broker prior to international shipping.',
     17,
     discY + 8,
     { maxWidth: pageWidth - 34 }

@@ -110,7 +110,7 @@ export const Footer: React.FC = () => {
       {/* Bottom bar */}
       <div className="border-t border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-stone-500">
-          <p>© 2026 RuralCraft Global. All rights reserved. | Student Demo Platform — Not Commercially Active.</p>
+          <p>© 2026 RuralCraft Global. All rights reserved. | Rural Craftsmanship & Customs Automation Platform.</p>
           <p className="flex items-center gap-1">
             Built with <Heart className="w-3 h-3 text-rose-500 fill-rose-500" /> for rural artisan communities.
           </p>

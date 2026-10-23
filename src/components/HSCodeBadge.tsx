@@ -101,7 +101,7 @@ export const HSCodeBadge: React.FC<HSCodeBadgeProps> = ({
                 <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-900 text-xs flex gap-2.5">
                   <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold">Student Demo / Prototype Notice:</span>
+                    <span className="font-bold">Harmonized System Classification Notice:</span>
                     <p className="mt-0.5 text-amber-800/90 leading-relaxed">
                       This HS code is automatically suggested based on keyword heuristics and category rules. It is not legally certified. Final customs declarations must be reviewed and verified by an authorized customs broker prior to international shipping.
                     </p>

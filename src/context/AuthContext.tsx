@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../services/supabase';
 import { api } from '../services/api';
 import type { User, Profile, Artisan, UserRole } from '../types';
 
@@ -8,12 +9,22 @@ interface AuthContextType {
   artisan: Artisan | null;
   role: UserRole | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<void>;
-  register: (data: { email: string; password: string; full_name: string; phone?: string; role?: string; brand_name?: string; craft_type?: string; location?: string }) => Promise<void>;
-  demoLogin: (role: 'customer' | 'artisan') => Promise<void>;
-  logout: () => void;
+  login: (email: string, pass: string) => Promise<{ user: User; profile: Profile; artisan: Artisan | null }>;
+  register: (data: {
+    email: string;
+    password: string;
+    full_name: string;
+    phone?: string;
+    role?: string;
+    brand_name?: string;
+    craft_type?: string;
+    location?: string;
+  }) => Promise<{ user: User; profile: Profile; artisan: Artisan | null }>;
+  logout: () => Promise<void>;
   updateUserArtisan: (artisan: Artisan) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,12 +35,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [artisan, setArtisan] = useState<Artisan | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Initialize and synchronize Supabase Auth session
   const initAuth = async () => {
-    const token = localStorage.getItem('rcg_token');
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     try {
       const data = await api.getMe();
       if (data && data.user) {
@@ -37,10 +44,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(data.profile);
         setArtisan(data.artisan);
       } else {
-        localStorage.removeItem('rcg_token');
+        setUser(null);
+        setProfile(null);
+        setArtisan(null);
       }
-    } catch {
-      localStorage.removeItem('rcg_token');
+    } catch (err) {
+      console.warn('Session check warning:', err);
+      setUser(null);
+      setProfile(null);
+      setArtisan(null);
     } finally {
       setLoading(false);
     }
@@ -48,57 +60,91 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     initAuth();
+
+    // Listen to real-time Supabase auth state changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+        const me = await api.getMe();
+        if (me) {
+          setUser(me.user);
+          setProfile(me.profile);
+          setArtisan(me.artisan);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setProfile(null);
+        setArtisan(null);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, pass: string) => {
     setLoading(true);
     try {
       const res = await api.login(email, pass);
-      localStorage.setItem('rcg_token', res.token);
       setUser(res.user);
       setProfile(res.profile);
       setArtisan(res.artisan);
+      return res;
     } finally {
       setLoading(false);
     }
   };
 
-  const register = async (data: { email: string; password: string; full_name: string; phone?: string; role?: string; brand_name?: string; craft_type?: string; location?: string }) => {
+  const register = async (data: {
+    email: string;
+    password: string;
+    full_name: string;
+    phone?: string;
+    role?: string;
+    brand_name?: string;
+    craft_type?: string;
+    location?: string;
+  }) => {
     setLoading(true);
     try {
       const res = await api.register(data);
-      localStorage.setItem('rcg_token', res.token);
       setUser(res.user);
       setProfile(res.profile);
       setArtisan(res.artisan);
+      return res;
     } finally {
       setLoading(false);
     }
   };
 
-  const demoLogin = async (roleToUse: 'customer' | 'artisan') => {
+  const logout = async () => {
     setLoading(true);
     try {
-      const res = await api.demoLogin(roleToUse);
-      localStorage.setItem('rcg_token', res.token);
-      setUser(res.user);
-      setProfile(res.profile);
-      setArtisan(res.artisan);
+      await api.logout();
+      setUser(null);
+      setProfile(null);
+      setArtisan(null);
     } finally {
       setLoading(false);
     }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('rcg_token');
-    setUser(null);
-    setProfile(null);
-    setArtisan(null);
   };
 
   const updateUserArtisan = (newArtisan: Artisan) => {
     setArtisan(newArtisan);
   };
+
+  const refreshUser = async () => {
+    const me = await api.getMe();
+    if (me) {
+      setUser(me.user);
+      setProfile(me.profile);
+      setArtisan(me.artisan);
+    }
+  };
+
+  const role = user ? user.role : null;
+  const isAuthenticated = !!user;
+  const isAdmin = role === 'admin';
 
   return (
     <AuthContext.Provider
@@ -106,14 +152,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         profile,
         artisan,
-        role: user ? user.role : null,
-        isAuthenticated: !!user,
+        role,
+        isAuthenticated,
+        isAdmin,
         loading,
         login,
         register,
-        demoLogin,
         logout,
-        updateUserArtisan
+        updateUserArtisan,
+        refreshUser
       }}
     >
       {children}

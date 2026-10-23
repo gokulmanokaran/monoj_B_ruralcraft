@@ -7,7 +7,6 @@ import { useToast } from '../../context/ToastContext';
 import { api } from '../../services/api';
 import type { Category, HSSuggestionResult } from '../../types';
 import { HSCodeBadge } from '../../components/HSCodeBadge';
-import { RoleSwitcher } from '../../components/RoleSwitcher';
 
 export const AddProductPage: React.FC = () => {
   const navigate = useNavigate();
@@ -104,7 +103,6 @@ export const AddProductPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-stone-50">
-      <RoleSwitcher />
       <div className="max-w-2xl mx-auto px-4 py-10">
         <div className="mb-6">
           <button
@@ -219,7 +217,7 @@ export const AddProductPage: React.FC = () => {
             )}
 
             <div className="mt-3 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
-              ⚠️ Student Demo: HS codes are system suggestions. Must be verified before export.
+              ⚠️ Customs Classification: HS codes are system suggestions based on craft materials and category. Verify before export.
             </div>
           </div>
 

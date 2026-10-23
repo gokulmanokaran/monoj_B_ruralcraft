@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
-import { RoleSwitcher } from '../../components/RoleSwitcher';
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/artisan' },
@@ -41,7 +40,6 @@ export const ArtisanDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-stone-50 flex flex-col">
-      <RoleSwitcher />
       <div className="flex flex-1">
         {/* Sidebar */}
         <aside className="w-60 bg-[#143826] text-white flex flex-col shrink-0 hidden lg:flex">

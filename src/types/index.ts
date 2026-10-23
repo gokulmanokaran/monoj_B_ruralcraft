@@ -10,11 +10,13 @@ export interface User {
 
 export interface Profile {
   id: string;
-  user_id: string;
+  full_name: string;
+  phone?: string;
+  role: UserRole;
   bio?: string;
   avatar_url?: string;
-  default_currency: string;
-  country: string;
+  default_currency?: string;
+  country?: string;
   city?: string;
   address_line?: string;
 }

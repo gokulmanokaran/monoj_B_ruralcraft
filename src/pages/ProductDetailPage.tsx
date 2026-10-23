@@ -300,7 +300,7 @@ export const ProductDetailPage: React.FC = () => {
                     />
                   </div>
                   <div className="text-[10px] text-stone-500 bg-amber-50 border border-amber-200 rounded-lg p-2 leading-relaxed">
-                    ⚠️ <strong>Student Demo Platform:</strong> Suggested HS Code shown for demo purposes. Must be verified by authorized customs professional before export.
+                    ⚠️ <strong>Customs Notice:</strong> Suggested HS Code is automatically classified and must be verified by an authorized customs broker prior to international shipment.
                   </div>
                 </div>
               </div>

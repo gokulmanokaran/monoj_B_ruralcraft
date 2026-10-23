@@ -23,7 +23,7 @@ export const AuthPage: React.FC = () => {
   const [craftType, setCraftType] = useState('');
   const [location, setLocation] = useState('');
 
-  const { login, register, demoLogin } = useAuth();
+  const { login, register } = useAuth();
   const { success, error } = useToast();
   const navigate = useNavigate();
 
@@ -32,11 +32,15 @@ export const AuthPage: React.FC = () => {
     setLoading(true);
     try {
       if (mode === 'login') {
-        await login(email, password);
+        const res = await login(email, password);
         success('Welcome back!');
-        navigate('/');
+        if (res.user.role === 'artisan') {
+          navigate('/artisan');
+        } else {
+          navigate('/');
+        }
       } else {
-        await register({
+        const res = await register({
           email,
           password,
           full_name: fullName,
@@ -47,24 +51,14 @@ export const AuthPage: React.FC = () => {
           location: location || undefined
         });
         success(`Welcome to RuralCraft Global!`);
-        navigate('/');
+        if (res.user.role === 'artisan') {
+          navigate('/artisan');
+        } else {
+          navigate('/');
+        }
       }
     } catch (err: any) {
       error(err.message || 'Authentication failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoLogin = async (demoRole: 'customer' | 'artisan') => {
-    setLoading(true);
-    try {
-      await demoLogin(demoRole);
-      success(`Logged in as Demo ${demoRole}!`);
-      if (demoRole === 'artisan') navigate('/artisan');
-      else navigate('/');
-    } catch {
-      error('Demo login failed');
     } finally {
       setLoading(false);
     }
@@ -214,32 +208,6 @@ export const AuthPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Demo Quick Login */}
-          <div className="mt-5 pt-5 border-t border-stone-200">
-            <p className="text-xs text-center text-stone-400 font-semibold uppercase tracking-wider mb-3">
-              🚀 1-Click Demo Access
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { role: 'customer' as const, icon: User, label: 'Customer (Buyer)', color: 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border-emerald-200' },
-                { role: 'artisan' as const, icon: Palette, label: 'Artisan (Seller)', color: 'bg-amber-50 text-amber-800 hover:bg-amber-100 border-amber-200' }
-              ].map(({ role: r, icon: Icon, label, color }) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => handleDemoLogin(r)}
-                  disabled={loading}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${color}`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[10px] text-stone-400 text-center mt-2">
-              Demo credentials — no real data required
-            </p>
-          </div>
         </div>
       </motion.div>
     </div>
