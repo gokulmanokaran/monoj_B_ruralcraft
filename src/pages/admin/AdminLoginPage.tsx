@@ -23,19 +23,26 @@ export const AdminLoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail || !password) {
       error('Please enter your email and password.');
       return;
     }
+
+    if (cleanEmail.toLowerCase() !== 'admin@gmail.com') {
+      error('Access denied. Administrator privileges required.');
+      return;
+    }
+
+    if (password !== 'admin@123') {
+      error('Invalid password for administrator.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const res = await login(email.trim(), password);
-      if (res.user.role !== 'admin') {
-        // Non-admin tried to access admin login → sign them out and show error
-        const { supabase } = await import('../../services/supabase');
-        await supabase.auth.signOut();
-        throw new Error('Access denied. Administrator privileges required.');
-      }
+      await login(cleanEmail, password);
       success('Welcome to the Admin Portal!');
       navigate('/admin', { replace: true });
     } catch (err: any) {
@@ -69,7 +76,7 @@ export const AdminLoginPage: React.FC = () => {
             </div>
           </div>
           <p className="text-xs text-stone-400 mt-2">
-            Secure Customs Automation &amp; Global Platform Management
+            Direct Customs Automation &amp; Global Platform Management
           </p>
         </div>
 
@@ -82,8 +89,8 @@ export const AdminLoginPage: React.FC = () => {
                 Enter your admin credentials to access operations
               </p>
             </div>
-            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200 shrink-0">
-              Supabase Auth
+            <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 text-[10px] font-bold border border-amber-200 shrink-0">
+              Direct Admin Access
             </span>
           </div>
 
@@ -103,7 +110,7 @@ export const AdminLoginPage: React.FC = () => {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="admin@gmail.com"
-                  className="w-full pl-10 pr-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#143826]/30 focus:border-[#143826] transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#DDA15E]/40 focus:border-[#DDA15E] transition-colors"
                 />
               </div>
             </div>
@@ -123,7 +130,7 @@ export const AdminLoginPage: React.FC = () => {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#143826]/30 focus:border-[#143826] transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#DDA15E]/40 focus:border-[#DDA15E] transition-colors"
                 />
               </div>
             </div>
@@ -131,7 +138,7 @@ export const AdminLoginPage: React.FC = () => {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 bg-[#143826] hover:bg-[#0D2818] text-white font-bold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer shadow-md hover:shadow-lg mt-2"
+              className="w-full py-3 bg-[#DDA15E] hover:bg-[#BC6C25] text-[#0D2818] font-bold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer shadow-md hover:shadow-lg mt-2"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
               Sign In to Admin Portal

@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { supabase } from '../services/supabase';
 
 type LoginMode = 'customer' | 'admin';
 
@@ -25,8 +24,11 @@ export const AuthPage: React.FC = () => {
   // If already logged in, redirect to correct area
   useEffect(() => {
     if (isAuthenticated) {
-      if (role === 'admin') navigate('/admin', { replace: true });
-      else navigate('/', { replace: true });
+      if (role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     }
   }, [isAuthenticated, role, navigate]);
 
@@ -40,27 +42,36 @@ export const AuthPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail || !password) {
       error('Please enter your email and password.');
       return;
     }
 
     setLoading(true);
-    try {
-      const res = await login(email.trim(), password);
 
+    try {
       if (mode === 'admin') {
-        // Admin tab: must have admin role
-        if (res.user.role !== 'admin') {
-          await supabase.auth.signOut();
-          throw new Error('Access denied. Administrator privileges required.');
+        // Direct Admin Login (No Supabase setup required)
+        if (cleanEmail.toLowerCase() !== 'admin@gmail.com') {
+          throw new Error('Access denied. Administrator privileges required for this portal.');
         }
-        success(`Welcome, ${res.user.full_name}!`);
+        if (password !== 'admin@123') {
+          throw new Error('Invalid password. Please enter the correct admin password.');
+        }
+
+        await login(cleanEmail, password);
+        success('Welcome to the Admin Portal!');
         navigate('/admin', { replace: true });
       } else {
-        // Customer tab: block admin from using customer login
+        // Customer Login (Supabase)
+        if (cleanEmail.toLowerCase() === 'admin@gmail.com') {
+          throw new Error('Please use the Admin Login tab for administrator access.');
+        }
+
+        const res = await login(cleanEmail, password);
         if (res.user.role === 'admin') {
-          await supabase.auth.signOut();
           throw new Error('Please use the Admin Login tab for administrator access.');
         }
         success(`Welcome back, ${res.user.full_name}!`);
@@ -108,6 +119,8 @@ export const AuthPage: React.FC = () => {
           {/* Tab Switcher */}
           <div className="flex border-b border-stone-100">
             <button
+              type="button"
+              id="customer-login-tab"
               onClick={() => switchMode('customer')}
               className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-semibold transition-all cursor-pointer ${
                 mode === 'customer'
@@ -119,6 +132,8 @@ export const AuthPage: React.FC = () => {
               Customer Login
             </button>
             <button
+              type="button"
+              id="admin-login-tab"
               onClick={() => switchMode('admin')}
               className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-semibold transition-all cursor-pointer ${
                 mode === 'admin'
@@ -159,11 +174,15 @@ export const AuthPage: React.FC = () => {
                   </h1>
                   <p className="text-xs text-stone-500 mt-0.5">
                     {isAdmin
-                      ? 'Access the admin command center'
+                      ? 'Direct command center access'
                       : 'Sign in to browse and shop'}
                   </p>
                 </div>
-                {isAdmin && (
+                {isAdmin ? (
+                  <span className="ml-auto shrink-0 px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-bold border border-amber-200">
+                    Direct Access
+                  </span>
+                ) : (
                   <span className="ml-auto shrink-0 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
                     Supabase Auth
                   </span>
@@ -188,7 +207,7 @@ export const AuthPage: React.FC = () => {
                       autoComplete="email"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder={isAdmin ? 'admin@gmail.com' : 'you@example.com'}
+                      placeholder={isAdmin ? 'admin@gmail.com' : 'user@gmail.com'}
                       className={`w-full pl-10 pr-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 transition-colors ${
                         isAdmin
                           ? 'focus:ring-[#DDA15E]/40 focus:border-[#DDA15E]'
@@ -235,11 +254,12 @@ export const AuthPage: React.FC = () => {
                 {/* Submit */}
                 <button
                   type="submit"
+                  id={`${mode}-submit-button`}
                   disabled={loading}
-                  className={`w-full py-3 text-white font-bold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer shadow-md hover:shadow-lg mt-1 ${
+                  className={`w-full py-3 font-bold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer shadow-md hover:shadow-lg mt-1 ${
                     isAdmin
                       ? 'bg-[#DDA15E] hover:bg-[#BC6C25] text-[#0D2818]'
-                      : 'bg-[#143826] hover:bg-[#0D2818]'
+                      : 'bg-[#143826] hover:bg-[#0D2818] text-white'
                   }`}
                 >
                   {loading
@@ -261,7 +281,7 @@ export const AuthPage: React.FC = () => {
                   <ArrowLeft className="w-3.5 h-3.5" />
                   Back to Marketplace
                 </Link>
-                <span>{isAdmin ? 'Protected Route' : 'Secured by Supabase'}</span>
+                <span>{isAdmin ? 'Direct Admin Access' : 'Customer Account'}</span>
               </div>
             </motion.div>
           </AnimatePresence>

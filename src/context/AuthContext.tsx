@@ -3,6 +3,24 @@ import { supabase } from '../services/supabase';
 import { api } from '../services/api';
 import type { User, Profile, Artisan, UserRole } from '../types';
 
+const LOCAL_ADMIN_KEY = 'rc_admin_session';
+
+const FIXED_ADMIN_USER: User = {
+  id: 'admin-fixed-id',
+  email: 'admin@gmail.com',
+  full_name: 'Administrator',
+  role: 'admin',
+  phone: '+91 98765 43210'
+};
+
+const FIXED_ADMIN_PROFILE: Profile = {
+  id: 'admin-fixed-id',
+  full_name: 'Administrator',
+  role: 'admin',
+  phone: '+91 98765 43210',
+  country: 'India'
+};
+
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
@@ -27,6 +45,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadUser = async () => {
     try {
+      // Check for direct local admin session first (no Supabase account needed)
+      if (typeof window !== 'undefined' && localStorage.getItem(LOCAL_ADMIN_KEY) === 'true') {
+        setUser(FIXED_ADMIN_USER);
+        setProfile(FIXED_ADMIN_PROFILE);
+        setArtisan(null);
+        return;
+      }
+
       const data = await api.getMe();
       if (data?.user) {
         setUser(data.user);
@@ -58,6 +84,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!ready) return;
 
+      // When local admin is active, keep local session intact
+      if (typeof window !== 'undefined' && localStorage.getItem(LOCAL_ADMIN_KEY) === 'true') {
+        return;
+      }
+
       if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') && session?.user) {
         const me = await api.getMe();
         if (me) {
@@ -80,6 +111,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, pass: string) => {
     setLoading(true);
     try {
+      const cleanEmail = email.trim().toLowerCase();
+
+      // Direct Admin Login (admin@gmail.com / admin@123) without requiring Supabase auth
+      if (cleanEmail === 'admin@gmail.com') {
+        if (pass === 'admin@123') {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(LOCAL_ADMIN_KEY, 'true');
+          }
+          setUser(FIXED_ADMIN_USER);
+          setProfile(FIXED_ADMIN_PROFILE);
+          setArtisan(null);
+          return {
+            user: FIXED_ADMIN_USER,
+            profile: FIXED_ADMIN_PROFILE,
+            artisan: null
+          };
+        } else {
+          throw new Error('Invalid password. Please use admin@123');
+        }
+      }
+
+      // Customer login via Supabase Auth
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(LOCAL_ADMIN_KEY);
+      }
       const res = await api.login(email, pass);
       setUser(res.user);
       setProfile(res.profile);
@@ -93,7 +149,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     setLoading(true);
     try {
-      await supabase.auth.signOut();
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(LOCAL_ADMIN_KEY);
+      }
+      await supabase.auth.signOut().catch(() => {});
       setUser(null);
       setProfile(null);
       setArtisan(null);
@@ -107,6 +166,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshUser = async () => {
+    if (typeof window !== 'undefined' && localStorage.getItem(LOCAL_ADMIN_KEY) === 'true') {
+      setUser(FIXED_ADMIN_USER);
+      setProfile(FIXED_ADMIN_PROFILE);
+      setArtisan(null);
+      return;
+    }
+
     const me = await api.getMe();
     if (me) {
       setUser(me.user);
