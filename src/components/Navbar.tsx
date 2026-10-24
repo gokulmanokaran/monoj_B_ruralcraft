@@ -50,11 +50,13 @@ export const Navbar: React.FC = () => {
   ];
 
   const getDashboardLink = () => {
+    if (role === 'admin') return '/admin';
     if (role === 'artisan') return '/artisan';
     return '/account';
   };
 
   const getDashboardLabel = () => {
+    if (role === 'admin') return 'Admin Command Center';
     if (role === 'artisan') return 'Artisan Studio';
     return 'My Account & Orders';
   };
@@ -177,9 +179,10 @@ export const Navbar: React.FC = () => {
                           <p className="text-xs font-bold text-stone-900 truncate">{user.full_name}</p>
                           <p className="text-[11px] text-stone-400 truncate">{user.email}</p>
                           <span className={`inline-block mt-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            role === 'admin' ? 'bg-amber-100 text-amber-900 border border-amber-300' :
                             role === 'artisan' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
                           }`}>
-                            {role === 'artisan' ? 'Verified Artisan' : 'Customer'}
+                            {role === 'admin' ? 'Administrator' : role === 'artisan' ? 'Verified Artisan' : 'Customer'}
                           </span>
                         </div>
 

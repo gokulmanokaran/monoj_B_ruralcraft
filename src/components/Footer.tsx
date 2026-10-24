@@ -44,7 +44,8 @@ export const Footer: React.FC = () => {
                 { label: 'Meet Our Artisans', href: '/artisans' },
                 { label: 'How It Works', href: '/#how-it-works' },
                 { label: 'Customs Intelligence', href: '/#features' },
-                { label: 'Become an Artisan', href: '/register?role=artisan' }
+                { label: 'Become an Artisan', href: '/register?role=artisan' },
+                { label: 'Admin Portal', href: '/login' }
               ].map(({ label, href }) => (
                 <li key={label}>
                   <Link to={href} className="text-sm text-stone-400 hover:text-white transition-colors">{label}</Link>
