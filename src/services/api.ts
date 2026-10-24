@@ -449,23 +449,49 @@ class ApiService {
     return this.getProduct(newProd.id);
   }
 
-  async updateProduct(id: string, productData: Partial<Product>): Promise<Product> {
+  async updateProduct(id: string, productData: Partial<Product> & { images?: string[] }): Promise<Product> {
     const updates: Record<string, any> = {};
     if (productData.name !== undefined) updates.name = productData.name;
     if (productData.description !== undefined) updates.description = productData.description;
-    if (productData.price_inr !== undefined) updates.price_inr = productData.price_inr;
-    if (productData.stock !== undefined) updates.stock = productData.stock;
+    if (productData.price_inr !== undefined) updates.price_inr = Number(productData.price_inr);
+    if (productData.stock !== undefined) updates.stock = Number(productData.stock);
+    if (productData.category_id !== undefined) updates.category_id = productData.category_id;
+    if (productData.weight_kg !== undefined) updates.weight_kg = Number(productData.weight_kg);
+    if (productData.dimensions !== undefined) updates.dimensions = productData.dimensions;
+    if (productData.material !== undefined) updates.material = productData.material;
+    if (productData.country_of_origin !== undefined) updates.country_of_origin = productData.country_of_origin;
     if (productData.status !== undefined) updates.status = productData.status;
     if (productData.suggested_hs_code !== undefined) updates.suggested_hs_code = productData.suggested_hs_code;
+    if (productData.hs_confidence !== undefined) updates.hs_confidence = productData.hs_confidence;
     if (productData.hs_code_verified !== undefined) updates.hs_code_verified = productData.hs_code_verified;
 
-    const { error } = await supabase
-      .from('products')
-      .update(updates)
-      .eq('id', id);
+    if (Object.keys(updates).length > 0) {
+      const { error } = await supabase
+        .from('products')
+        .update(updates)
+        .eq('id', id);
 
-    if (error) {
-      throw new Error(`Failed to update product: ${error.message}`);
+      if (error) {
+        throw new Error(`Failed to update product: ${error.message}`);
+      }
+    }
+
+    // Update images if provided
+    if (productData.images && productData.images.length > 0) {
+      try {
+        await supabase.from('product_images').delete().eq('product_id', id);
+        const imageRows = productData.images.filter(Boolean).map((url, idx) => ({
+          product_id: id,
+          image_url: url,
+          is_primary: idx === 0,
+          sort_order: idx
+        }));
+        if (imageRows.length > 0) {
+          await supabase.from('product_images').insert(imageRows);
+        }
+      } catch (imgErr) {
+        console.warn('Could not update product_images table, continuing:', imgErr);
+      }
     }
 
     return this.getProduct(id);

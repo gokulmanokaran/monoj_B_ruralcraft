@@ -47,6 +47,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
   const [uploadingProduct, setUploadingProduct] = useState(false);
   const [hsSuggesting, setHsSuggesting] = useState(false);
 
+  // Edit Product Modal State
+  const [isEditProductOpen, setIsEditProductOpen] = useState(false);
+  const [updatingProduct, setUpdatingProduct] = useState(false);
+  const [editProductForm, setEditProductForm] = useState({
+    id: '',
+    name: '',
+    category_id: '',
+    category_name: '',
+    price_inr: '',
+    stock: '15',
+    weight_kg: '0.8',
+    dimensions: '25 x 15 x 15 cm',
+    material: 'Natural Terracotta Clay',
+    country_of_origin: 'India',
+    suggested_hs_code: '6912.00',
+    hs_confidence: 'High' as 'High' | 'Medium' | 'Low',
+    hs_code_verified: true,
+    description: '',
+    image_url: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=800',
+    status: 'active' as 'active' | 'draft' | 'out_of_stock'
+  });
+
   const [newProduct, setNewProduct] = useState({
     name: '',
     category_id: '',
@@ -264,6 +286,103 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
       error(err.message || 'Failed to upload product to Supabase');
     } finally {
       setUploadingProduct(false);
+    }
+  };
+
+  const handleOpenEditProduct = (prod: Product) => {
+    setEditProductForm({
+      id: prod.id,
+      name: prod.name,
+      category_id: prod.category_id || (categories[0]?.id || ''),
+      category_name: prod.category_name || (categories[0]?.name || ''),
+      price_inr: (prod.price_inr ?? '').toString(),
+      stock: (prod.stock ?? 1).toString(),
+      weight_kg: (prod.weight_kg ?? 0.5).toString(),
+      dimensions: prod.dimensions || '',
+      material: prod.material || '',
+      country_of_origin: prod.country_of_origin || 'India',
+      suggested_hs_code: prod.suggested_hs_code || '4602.11',
+      hs_confidence: (prod.hs_confidence as 'High' | 'Medium' | 'Low') || 'High',
+      hs_code_verified: !!prod.hs_code_verified,
+      description: prod.description || '',
+      image_url: prod.images?.[0] || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=800',
+      status: (prod.status as 'active' | 'draft' | 'out_of_stock') || 'active'
+    });
+    setIsEditProductOpen(true);
+  };
+
+  const handleEditImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      error('Image size must be less than 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setEditProductForm(prev => ({ ...prev, image_url: reader.result as string }));
+      success('Image loaded for preview!');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleEditAutoSuggestHS = async () => {
+    if (!editProductForm.name.trim()) {
+      error('Enter product title first to auto-suggest HS code');
+      return;
+    }
+    setHsSuggesting(true);
+    try {
+      const res = await api.suggestHSCode({
+        name: editProductForm.name,
+        material: editProductForm.material,
+        description: editProductForm.description,
+        category_name: editProductForm.category_name
+      });
+      setEditProductForm(prev => ({ ...prev, suggested_hs_code: res.hs_code, hs_confidence: res.confidence as any }));
+      success(`HS Code auto-suggested: ${res.hs_code} (${res.confidence} confidence)`);
+    } catch {
+      error('Failed to auto-suggest HS Code');
+    } finally {
+      setHsSuggesting(false);
+    }
+  };
+
+  const handleSaveEditProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editProductForm.name.trim() || !editProductForm.price_inr) {
+      error('Product title and price (INR) are required');
+      return;
+    }
+
+    setUpdatingProduct(true);
+    try {
+      const cat = categories.find(c => c.id === editProductForm.category_id || c.name === editProductForm.category_name) || categories[0];
+
+      await api.updateProduct(editProductForm.id, {
+        name: editProductForm.name.trim(),
+        category_id: cat?.id || editProductForm.category_id,
+        price_inr: parseFloat(editProductForm.price_inr),
+        stock: parseInt(editProductForm.stock) || 0,
+        weight_kg: parseFloat(editProductForm.weight_kg) || 0.5,
+        dimensions: editProductForm.dimensions || '',
+        material: editProductForm.material || '',
+        country_of_origin: editProductForm.country_of_origin || 'India',
+        suggested_hs_code: editProductForm.suggested_hs_code || '4602.11',
+        hs_confidence: editProductForm.hs_confidence,
+        hs_code_verified: editProductForm.hs_code_verified,
+        status: editProductForm.status,
+        description: editProductForm.description.trim(),
+        images: editProductForm.image_url ? [editProductForm.image_url] : undefined
+      });
+
+      success(`Product "${editProductForm.name}" updated successfully in Supabase!`);
+      setIsEditProductOpen(false);
+      await loadAllData();
+    } catch (err: any) {
+      error(err.message || 'Failed to update product in Supabase');
+    } finally {
+      setUpdatingProduct(false);
     }
   };
 
@@ -1033,6 +1152,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
                                     <Eye className="w-3.5 h-3.5" />
                                   </Link>
                                   <button
+                                    onClick={() => handleOpenEditProduct(product)}
+                                    title="Edit product name, price, stock, description & HS Code"
+                                    className="p-1.5 rounded-lg text-stone-400 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
                                     onClick={() => handleDeleteProduct(product.id, product.name)}
                                     title="Delete product from Supabase"
                                     className="p-1.5 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
@@ -1721,6 +1847,328 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
         )}
       </AnimatePresence>
 
+      {/* Modal: Edit Product in Supabase */}
+      <AnimatePresence>
+        {isEditProductOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl my-8 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-stone-100 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-700 flex items-center justify-center text-[#DDA15E]">
+                    <Edit3 className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-black text-lg text-stone-900">Edit Product Details</h3>
+                    <p className="text-xs text-stone-500">Live syncs to Explore catalog, detail pages, and multi-currency engine</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditProductOpen(false)}
+                  className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditProduct} className="space-y-4">
+                {/* Product Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Product Title <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Handcrafted Jaipur Blue Pottery Flower Vase"
+                    value={editProductForm.name}
+                    onChange={e => setEditProductForm({ ...editProductForm, name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20 focus:border-[#143826] transition-colors"
+                  />
+                </div>
+
+                {/* Category & Price */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Category <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={editProductForm.category_id}
+                      onChange={e => {
+                        const sel = categories.find(c => c.id === e.target.value);
+                        setEditProductForm({
+                          ...editProductForm,
+                          category_id: e.target.value,
+                          category_name: sel?.name || ''
+                        });
+                      }}
+                      className="w-full px-3 py-2.5 border border-stone-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-[#143826]/20 focus:border-[#143826]"
+                    >
+                      {categories.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">
+                      Price (INR ₹) <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 font-bold text-xs">₹</span>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        step="1"
+                        placeholder="1850"
+                        value={editProductForm.price_inr}
+                        onChange={e => setEditProductForm({ ...editProductForm, price_inr: e.target.value })}
+                        className="w-full pl-7 pr-3 py-2.5 border border-stone-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-[#143826]/20 focus:border-[#143826]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stock, Weight, Dimensions, Status */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">Stock Units</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="15"
+                      value={editProductForm.stock}
+                      onChange={e => setEditProductForm({ ...editProductForm, stock: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">Weight (kg)</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0.05"
+                      placeholder="0.85"
+                      value={editProductForm.weight_kg}
+                      onChange={e => setEditProductForm({ ...editProductForm, weight_kg: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">Dimensions</label>
+                    <input
+                      type="text"
+                      placeholder="25 x 15 cm"
+                      value={editProductForm.dimensions}
+                      onChange={e => setEditProductForm({ ...editProductForm, dimensions: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">Status</label>
+                    <select
+                      value={editProductForm.status}
+                      onChange={e => setEditProductForm({ ...editProductForm, status: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-[#143826]/20"
+                    >
+                      <option value="active">Active</option>
+                      <option value="draft">Draft</option>
+                      <option value="out_of_stock">Out of Stock</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Material & Country of Origin */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">Material Composition</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Quartz Stone, Clay & Natural Glaze"
+                      value={editProductForm.material}
+                      onChange={e => setEditProductForm({ ...editProductForm, material: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">Country of Origin</label>
+                    <input
+                      type="text"
+                      placeholder="India"
+                      value={editProductForm.country_of_origin}
+                      onChange={e => setEditProductForm({ ...editProductForm, country_of_origin: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+                </div>
+
+                {/* HS Code & Verification */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-stone-700">HS Customs Code</label>
+                      <button
+                        type="button"
+                        onClick={handleEditAutoSuggestHS}
+                        disabled={hsSuggesting}
+                        className="text-[11px] text-[#143826] font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Sparkles className="w-3 h-3 text-[#DDA15E]" />
+                        {hsSuggesting ? 'Analyzing...' : 'Auto-Suggest'}
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="e.g. 6912.00"
+                      value={editProductForm.suggested_hs_code}
+                      onChange={e => setEditProductForm({ ...editProductForm, suggested_hs_code: e.target.value })}
+                      className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs font-mono font-bold text-[#BC6C25] focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 mb-1">HS Customs Verification</label>
+                    <label className="flex items-center gap-2 mt-2 px-3 py-2 border border-stone-200 rounded-xl bg-stone-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editProductForm.hs_code_verified}
+                        onChange={e => setEditProductForm({ ...editProductForm, hs_code_verified: e.target.checked })}
+                        className="w-4 h-4 rounded text-[#143826] focus:ring-[#143826]"
+                      />
+                      <span className="text-xs font-medium text-stone-700">Verified by Customs Officer</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Image Section */}
+                <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-stone-800">Product Image URL</label>
+                    <span className="text-[10px] text-stone-400">Direct URL or Preset Selection</span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      placeholder="https://images.unsplash.com/..."
+                      value={editProductForm.image_url}
+                      onChange={e => setEditProductForm({ ...editProductForm, image_url: e.target.value })}
+                      className="flex-1 px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20"
+                    />
+                    <label className="px-3 py-2 bg-stone-200 hover:bg-stone-300 text-stone-700 text-xs font-semibold rounded-xl cursor-pointer flex items-center gap-1.5 shrink-0 transition-colors">
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      Browse
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleEditImageFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {/* 1-Click Quick Presets */}
+                  <div>
+                    <div className="text-[11px] font-semibold text-stone-600 mb-1.5">Quick Handicraft Photo Presets:</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { label: '🏺 Blue Pottery Vase', url: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=800' },
+                        { label: '🧣 Pashmina Silk', url: 'https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?auto=format&fit=crop&q=80&w=800' },
+                        { label: '🐘 Carved Teak', url: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&q=80&w=800' },
+                        { label: '🪔 Dokra Metal', url: 'https://images.unsplash.com/photo-1582561424760-0321d75e81fa?auto=format&fit=crop&q=80&w=800' },
+                        { label: '🧺 Bamboo Basket', url: 'https://images.unsplash.com/photo-1596178065887-1198b6148b2b?auto=format&fit=crop&q=80&w=800' },
+                        { label: '💎 Marble Inlay', url: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=800' }
+                      ].map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setEditProductForm({ ...editProductForm, image_url: preset.url })}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors cursor-pointer ${
+                            editProductForm.image_url === preset.url
+                              ? 'bg-[#143826] text-white border-[#143826]'
+                              : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Preview */}
+                  {editProductForm.image_url && (
+                    <div className="flex items-center gap-3 pt-2 border-t border-stone-200/60">
+                      <img
+                        src={editProductForm.image_url}
+                        alt="Preview"
+                        className="w-14 h-14 rounded-xl object-cover border border-stone-200 shadow-sm shrink-0"
+                        onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=800'; }}
+                      />
+                      <div className="text-[11px] text-stone-500">
+                        <span className="font-semibold text-stone-800">Live Preview:</span> Image will be updated live across the customer storefront and orders.
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">Description & Artisan Story</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Describe how the craft is handmade, materials used, and heritage origins..."
+                    value={editProductForm.description}
+                    onChange={e => setEditProductForm({ ...editProductForm, description: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-xs focus:ring-2 focus:ring-[#143826]/20 focus:border-[#143826]"
+                  />
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2.5 pt-4 border-t border-stone-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditProductOpen(false)}
+                    disabled={updatingProduct}
+                    className="px-5 py-2.5 border border-stone-200 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-50 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updatingProduct}
+                    className="px-6 py-2.5 bg-[#143826] hover:bg-[#0D2818] text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all disabled:opacity-60 cursor-pointer"
+                  >
+                    {updatingProduct ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        Saving to Supabase...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-[#DDA15E]" />
+                        Save Changes
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      
       {/* Modal: Edit Admin Profile */}
       <AnimatePresence>
         {isEditProfileOpen && (
