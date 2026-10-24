@@ -160,11 +160,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
 
   // Load portal data from Supabase
   useEffect(() => {
-    loadAllData();
+    loadAllData(true);
   }, []);
 
-  const loadAllData = async () => {
-    setLoading(true);
+  const loadAllData = async (showLoader = false) => {
+    if (showLoader) setLoading(true);
     try {
       const [analyticsData, artisansData, productsData, ordersData, hsData, customsData, ratesData, categoriesData] = await Promise.all([
         api.getAdminAnalytics().catch(() => null),
@@ -264,6 +264,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
         status: newProduct.status || 'active'
       });
 
+      setProducts(prev => [created, ...prev]);
       success(`Product "${created.name}" uploaded to Supabase & live on store!`);
       setIsAddProductOpen(false);
       setNewProduct({
@@ -281,7 +282,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
         image_url: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=800',
         status: 'active'
       });
-      await loadAllData();
     } catch (err: any) {
       error(err.message || 'Failed to upload product to Supabase');
     } finally {
@@ -388,12 +388,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
 
   const handleDeleteProduct = async (id: string, name: string) => {
     if (!window.confirm(`Are you sure you want to delete "${name}" from Supabase?`)) return;
+    const backupProducts = [...products];
+    // Instant optimistic removal from UI
+    setProducts(prev => prev.filter(p => p.id !== id));
+    success(`Product "${name}" deleted from database`);
+
     try {
       await api.deleteProduct(id);
-      success(`Product "${name}" deleted from database`);
-      await loadAllData();
     } catch (err: any) {
       error(err.message || 'Failed to delete product');
+      setProducts(backupProducts);
     }
   };
 
@@ -630,7 +634,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ initialTab = 'da
                   <p className="text-xs text-stone-500 mt-0.5">International artisan sales, customs clearance & platform metrics</p>
                 </div>
                 <button
-                  onClick={loadAllData}
+                  onClick={() => loadAllData(true)}
                   className="px-3.5 py-2 rounded-xl bg-white border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50 flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-[#143826]" />

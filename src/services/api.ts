@@ -494,7 +494,7 @@ class ApiService {
       }
     }
 
-    return this.getProduct(id);
+    return { id, ...productData } as any;
   }
 
   async deleteProduct(id: string): Promise<{ success: boolean; message: string }> {
